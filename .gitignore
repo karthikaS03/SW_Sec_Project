@@ -1,0 +1,19 @@
+/SWSec_Crawler/crawl_containers_data/*
+/SWSec_Crawler/output_logs/*
+/SWSec_Crawler/data/*
+/SWSec_Crawler/containers_data/*
+/SWSec_Crawler/demo_code/
+/SWSec_Crawler/sw_sec_containers_data/*
+/SWSec_Crawler/sw_sec_containers_data (copy 1)/*
+/SWSec_Crawler/logs/*
+/SWSec_Data/ServiceWorkers/*
+/SWSec_Data/SW_ASTs/*
+/SWSec_Demo/
+/SWSec_Analysis/demo_results/
+/SWSec_Analysis/plots/
+/SWSec_Analysis/dot_graphs/
+/SWSec_Analysis/sw_clustering/*.csv
+/SWSec_Analysis/sw_clustering/*.ods
+cases/
+results/
+

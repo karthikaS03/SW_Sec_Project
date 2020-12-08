@@ -1,0 +1,401 @@
+import pygraphviz as pgv
+from datetime import datetime
+from parse_logs.parse_utils import *
+import pandas as pd 
+import matplotlib.pyplot as plt
+
+LOG_FILE = None
+
+NODE_LOG_CALLS = set(['LogSWInfo', 'LogSWEvent', 'LogSWContextInfo', 'LogNotificationData', 'DidCallFunction' ,                        ])
+
+START_END_EVENT_MAPS = {'InitializeOnWorkerThread':'PrepareForShutdownOnWorkerThread',
+                        'StartEvent':'EndEvent', 
+                        'StartFetchEvent':'DidHandleFetchEvent', 
+                        'StartFunctionCall':'EndFunctionCall',
+                        'DispatchPushEvent': 'DidHandlePushEvent',
+                        'DispatchNotificationClickEvent':'DidHandleNotificationClickEvent',
+                        'DispatchNotificationCloseEvent':'DidHandleNotificationCloseEvent',
+                        'Fetch':'DidReceiveResponse',
+                        # 'InstallNewDocument':'DocumentWasClosed'
+                        # 'DispatchFetchEventForMainResource':
+                        }
+FOCUSSED_LOG_NAMES = set(['registerServiceWorker', 'InitializeOnWorkerThread',
+'PrepareForShutdownOnWorkerThread', 
+# 'InstallNewDocument','DocumentWasClosed',
+                        'StartEvent','EndEvent', 
+                        'StartFetchEvent','DidHandleFetchEvent', 
+                        'StartFunctionCall','EndFunctionCall',
+                        'DispatchPushEvent', 'DidHandlePushEvent',
+                        'DispatchNotificationClickEvent','DidHandleNotificationClickEvent',
+                        'DispatchNotificationCloseEvent','DidHandleNotificationCloseEvent',
+                        'Fetch','FetchAndRunClassicScript', 'importScripts','showNotification',
+                        'CreateNotificationData', 'DidReceiveResponse',
+                        'ResetIdleTimeout','requestPermission','PermissionDecided'
+                        ])
+
+PROCESS_TASK_USAGE_METHOD = 'FillProcessData'
+
+FOCUSSED_PROCESS_TAGS = [
+                # 'Tab', 
+                'Service Worker'
+                # ,'Browser'
+                ]
+
+NODE_ID = 0
+
+_TIME_STR_FORMAT = "%Y-%m-%d-%H:%M:%S"
+
+
+
+def get_node_id():
+    global NODE_ID
+
+    NODE_ID +=1
+    return NODE_ID
+
+def get_next_node_info():
+    line = 'blah'
+    # print(type(line))
+    # exit()
+    if not line:
+        return None
+    timestamp = None
+    proc_id = None
+    node_id = -1
+    try:
+        while(line):
+            # print(line)
+            line = LOG_FILE.readline().decode('utf-8')
+
+            if 'LOG::Forensics' in line and line.count(':')>1 and 'DebugInfo' not in line:
+                # proc_id = '_'.join(line.split(':')[:2])
+                proc_id = line.split(':')[0]
+                # if '23869' not in proc_id:
+                #     continue
+                time = line.split(':')[2] 
+                try:
+                    
+                    timestamp = datetime(2020, int(time[:2]), int(time[2:4]), int(time[5:7]),int(time[7:9]), int(time[9:11]), int(time[12:]))
+                except Exception as e:
+                    print(e)
+                    timestamp = None
+                entries = parse_log_entry(LOG_FILE)
+                    
+                if 'func_name' in entries:
+                    if entries['func_name'] in FOCUSSED_LOG_NAMES:
+                        node_id = get_node_id()
+                        G.add_node(node_id, label=entries['func_name'])
+                        if entries['func_name'] == 'DispatchPushEvent':
+                            print('\tPUSH ::', entries['script_url'], entries['registration_id'])
+                    elif entries['func_name']  == PROCESS_TASK_USAGE_METHOD:
+                        parse_task_usage(timestamp, entries)
+                return node_id,timestamp, proc_id, entries
+            elif 'INFO:CONSOLE' in line :                
+                with open('./demo_results/miner2_responses.txt','a+') as rf:
+                    rf.write(line)
+    except Exception as ex:
+            print(ex)
+
+def parse_task_usage(timestamp,log_entries):
+    global process_task_usage
+    # print(log_entries)
+    if 'process_title' in log_entries:
+        process_task_usage['title'].append(log_entries['process_title'])
+        process_task_usage['cpu'].append(float(log_entries['process_cpu']))
+        process_task_usage['memory'].append(float(log_entries['process_memory']))
+        process_task_usage['timestamp'].append(timestamp)
+
+def _truncate_time_to_sec(t):
+    
+    """ remove seconds from datetime t """
+    t_str = t.strftime(_TIME_STR_FORMAT)
+    return datetime.strptime(t_str, _TIME_STR_FORMAT)
+    
+def plot_task_usage(id):
+    global process_task_usage
+    
+    df = pd.DataFrame(process_task_usage)
+    # print(df.head())
+    if not df.empty :
+    
+        print(min(df['timestamp']),max(df['timestamp']))
+        min_time = _truncate_time_to_sec(min(df['timestamp']))
+        max_time = _truncate_time_to_sec(max(df['timestamp']))
+        
+        _, axes = plt.subplots(nrows=3, ncols=1, figsize=(8,10))
+        df_proc_cpu = pd.DataFrame()
+        df_proc_mem = pd.DataFrame()
+        process_titles = df['title'].unique()
+        # print(process_titles)
+        for proc in process_titles:
+            
+            if not any(p in proc for p in FOCUSSED_PROCESS_TAGS) or any(p in proc for p in ['about: blank','chrome', 'New Tab']):
+                continue
+            
+            try:                                               
+                df_proc_filtered = df[df['title']==proc]            
+                df_proc_filtered = df_proc_filtered.drop(columns=['title'])
+                df_proc_filtered['timestamp'] = [_truncate_time_to_sec(t) for t in df_proc_filtered['timestamp']]
+                df_proc_filtered = df_proc_filtered.groupby('timestamp').max()
+                df_proc_filtered = df_proc_filtered.reset_index()
+                df_proc_filtered = df_proc_filtered.drop_duplicates()     
+                
+                att = df_proc_filtered.set_index('timestamp')                
+                att = att.astype('float')            
+                idx = pd.date_range(min_time, max_time, freq='S')
+                date_reidx = att.reindex(idx)
+                if 'http' in proc and ':' in proc:
+                    proc = proc.split(':')[0] + ' : ' + (proc.split(':')[2]).split('/')[2]
+                cpu_name = 'CPU :: '+ proc
+                mem_name = 'Mem :: '+ proc
+                date_reidx[cpu_name] = date_reidx['cpu']
+                date_reidx[mem_name] = date_reidx['memory']
+                if len(df_proc_cpu)==0:
+                    df_proc_cpu = pd.DataFrame(date_reidx[cpu_name].copy())   
+                    df_proc_mem = pd.DataFrame(date_reidx[mem_name].copy()) 
+                else:
+                    df_proc_cpu[cpu_name] = pd.DataFrame(date_reidx[cpu_name].copy())   
+                    df_proc_mem[mem_name] = pd.DataFrame(date_reidx[mem_name].copy()) 
+            except Exception as e:
+                print(e)
+                continue
+        # df_proc_cpu.to_csv('proc_cpu.csv')
+        # df_proc_mem.to_csv('proc_mem_csv')
+        
+        
+        
+        box = axes[0].get_position()
+        print(box)
+        # axes[0].set_position([box.x0,0.45,box.width,box.height*0.90])
+        df_proc_cpu.plot(ax=axes[0], kind='line', title = 'CPU Usage', 
+                    legend=True).legend(loc='upper center',
+                    #  bbox_to_anchor=(0.02,1.5),
+                     ncol=2,prop={'size':6})
+        
+        box = axes[1].get_position()
+        print(box)
+        # axes[1].set_position([box.x0,box.y0,box.width,box.height*0.80])
+        df_proc_mem.plot(ax=axes[1], kind='line', title = 'Memory Usage', 
+                        legend=True).legend(loc= 'upper center', 
+                        # bbox_to_anchor=(0.02,1.5),
+                        ncol=2,prop={'size':6})
+         
+        # plt.legend( bbox_to_anchor=(0,2,1,100),mode='expand')
+        
+        # plt.show()             
+        return axes, min_time,max_time
+    return None                     
+        
+def draw_sw_graph(id):
+    global G
+    global sw_events_info
+
+    G.add_node(0, label='SessionStart')
+    node_info = {}
+    start_nodes = [(0,datetime.now(),0)]
+
+    def find_proc_nodes(curr_proc_id):
+        proc_start_nodes_idx= []
+        for i, st_node in enumerate(start_nodes):
+            prev_proc_id = st_node[2] 
+            if curr_proc_id == prev_proc_id:
+                proc_start_nodes_idx.append(i)
+        
+        if len(proc_start_nodes_idx)>0:
+            return proc_start_nodes_idx
+        return [0]
+
+    def find_st_node(curr_proc_id, label):
+        proc_start_nodes_idx= find_proc_nodes(curr_proc_id)
+        for ind in proc_start_nodes_idx[::-1]:
+            st_node_id = start_nodes[ind][0]
+            prev_node = G.get_node(st_node_id)
+            if label == START_END_EVENT_MAPS.get(prev_node.attr['label']) : 
+                return ind, True         
+        return proc_start_nodes_idx[-1],False  
+            
+
+    try:
+        
+        while( node_info !=None):
+            try:
+                node_info = get_next_node_info()
+                # print(node_info)
+                if node_info == None:
+                    break
+                node_id,timestamp, proc_id, entries = node_info
+                if node_id == -1:
+                    continue
+                node = G.get_node(node_id)
+                label = node.attr['label']
+                # print('Node :: ',label, proc_id, node_id)
+                # print(node_id,proc_id)
+                is_edge =True
+                prev_node_idx,is_end_node = find_st_node(proc_id,label)
+                prev_node_id = start_nodes[prev_node_idx][0] 
+
+                if  label in START_END_EVENT_MAPS:
+                    start_nodes.append((node_id,timestamp,proc_id))  
+                    print('Start Node :: ',label, proc_id, node_id)
+                    if 'service_worker_url' in entries:
+                        sw_events_info.append({
+                                    'timestamp'  : timestamp,
+                                    'sw_url'     : entries['service_worker_url'], 
+                                    'event_name' : entries['func_name']                                     
+                        })
+                    # print('\tStartNode :: ',label)
+                    # print(start_nodes[-1])       
+                                            
+                elif is_end_node:       
+                    st_node_id, st_timestamp, st_proc_id = start_nodes.pop(prev_node_idx)
+                    st_node = G.get_node(st_node_id) 
+                    print('End Node :: ',st_node.attr['label'],label,st_proc_id)           
+                    st_node.attr['label'] = st_node.attr['label'] + ' (' +str((timestamp-st_timestamp).total_seconds()) + ')'
+                    # print(st_node.attr['label'],label,st_proc_id)
+                    G.remove_node(node_id)
+                    is_edge=False
+                else:
+                    print('\t Node :: ',label, proc_id, node_id)
+                if is_edge:
+                    G.add_edge(prev_node_id, node_id)
+                    
+                # print(prev_node_id,node_id)
+            except Exception as e:
+                print(e)
+                continue
+        
+        # while len(start_nodes)>0:
+        #     node_id,timestamp = 
+        #     node = 
+
+        s = G.to_string()
+        with open('./dot_graphs/'+id+'.txt', 'w') as f:
+            f.write(s) 
+        G.layout("dot")  # layout with dot
+        # G.draw('./plots/'+id+"_sw_flow_graph.png")
+        
+    except Exception as e:
+        print(e) 
+    
+    
+def plot_sw_events(plt_det):
+    global sw_events_info
+    
+    if plt_det==None:
+        return
+    axes, min_time,max_time = plt_det
+    print(sw_events_info)
+    df_events = pd.DataFrame(sw_events_info)    
+
+    
+    if df_events.empty:
+        return
+    sw_urls = df_events['sw_url'].unique()
+    print(sw_urls)
+    # print(process_titles)
+    y_point = 10
+    for sw_url in sw_urls:
+        
+        try:                                               
+            df_events_filtered = df_events[df_events['sw_url']==sw_url]            
+            df_events_filtered = df_events_filtered.drop(columns=['sw_url'])
+            df_events_filtered['timestamp'] = [_truncate_time_to_sec(t) for t in df_events_filtered['timestamp']]
+            df_events_filtered = df_events_filtered.groupby('timestamp')['event_name'].apply(lambda ev : '--'.join(set(ev)))
+            df_events_filtered = df_events_filtered.reset_index()
+            df_events_filtered = df_events_filtered.drop_duplicates()     
+            print(df_events_filtered.head())
+                           
+            # df_events_filtered['timestamp'] = df_events_filtered['timestamp'].astype('float')  
+            att = df_events_filtered.set_index('timestamp')           
+            idx = pd.date_range(min_time, max_time, freq='S')
+            date_reidx = att.reindex(idx)
+            # print(att.head())
+            # print(date_reidx)
+            # date_reidx[sw_url] = date_reidx['event_name']
+            date_reidx = date_reidx.reset_index()            
+            date_reidx['y'] = date_reidx['event_name'].apply(lambda x: y_point if len(str(x))>3 else -1) 
+            y_point += 15
+            
+
+            fig = date_reidx.plot('index','y' ,ax=axes[2], kind='line', style='.',
+                        legend=True).legend(loc= 'upper center', 
+                        # bbox_to_anchor=(0.02,1.5),
+                        ncol=2,prop={'size':4},)
+            
+            # for i,row in date_reidx.iterrows():
+            #     # break
+            #     if row['y']>0:
+            #         axes[2].annotate(xy=(row['index'], row['y']), s=row['event_name'], ha='left', rotation=90, position=(row['index'],row['y']-10))
+
+            
+        
+        except Exception as e:
+            print(e)
+            continue
+            
+    axes[2].set_ylim(0, y_point)
+    # plt.show()
+            
+    
+
+if __name__ == "__main__":
+    import tarfile
+    import os
+    test = True
+    
+    sw_events_info = []
+
+    if test:
+        process_task_usage = {
+                        'title':[],
+                        'cpu':[],
+                        'memory':[],
+                        'timestamp':[]
+                }
+        id = 'miner_demo2'
+        log_tar_dir = '../../attack_demo2_miner2.tar'
+        t = tarfile.open(log_tar_dir,'r')
+        LOG_FILE = t.extractfile('attack_demo2_miner2.log') 
+        G = pgv.AGraph(directed=True, strict=True, ranksep='1',node_sep='2')
+        draw_sw_graph(id)
+        plt_det = plot_task_usage(id)
+        plot_sw_events(plt_det)
+        plt.tight_layout() 
+        plt.savefig('./plots/'+id+'_proc_usage.pdf')
+        exit()
+
+    
+    log_dir_path = '../SWSec_Crawler/sw_sec_containers_data/' 
+
+    for dir in os.listdir(log_dir_path):
+        log_path = os.path.join(log_dir_path,dir)  
+        if 'M_' not in dir:
+            continue      
+        for tar_file in os.listdir(log_path):
+            if 'chrome_log' in tar_file :
+                process_task_usage = {
+                        'title':[],
+                        'cpu':[],
+                        'memory':[],
+                        'timestamp':[]
+                }
+                id = "{}_{}".format(dir.replace('container_',''),tar_file.replace('chrome_log_','')) 
+                id = id.replace('.tar','')
+                # print(id)
+                # if id != 'M134_0':
+                #     continue
+                log_tar_dir = os.path.join(log_path,tar_file)
+                t = tarfile.open(log_tar_dir,'r')
+                LOG_FILE = t.extractfile('chrome_debug.log') 
+                print(LOG_FILE)               
+                # LOG_FILE = open('../../sw_Sec.log','r')
+                G = pgv.AGraph(directed=True, strict=True, ranksep='1',node_sep='2')
+                draw_sw_graph(id)
+                # plot_task_usage(id)
+                plt_det = plot_task_usage(id)
+                plot_sw_events(plt_det)
+                plt.tight_layout() 
+                plt.savefig('./plots/'+id+'_proc_usage.pdf')
+                # exit()
+                
+    
