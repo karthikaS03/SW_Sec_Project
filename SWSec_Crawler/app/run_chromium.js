@@ -48,12 +48,12 @@ async function load_page(url,id,i_count,wait_time){
     // '../chrome_swsec/chrome',
                           home_dir+'chromium/chrome',
                           // userDataDir:home_dir+'chrome_user/',
-                          // ignoreDefaultArgs: ['--enable-automation'],
+                          ignoreDefaultArgs: ['--enable-automation'],
                            args: [
                                 '--enable-features=NetworkService',
                                 '--no-sandbox',
-                                // '--disable-setuid-sandbox',
-                                '--window-size=${ width },${ height }',
+                                '--disable-setuid-sandbox',
+                                //'--window-size=${ width },${ height }',
                                 '--start-maximized',
                                 '--ignore-certificate-errors','--disable-gpu', '--disable-software-rasterizer', '--disable-infobars' ]
                          }).then(async browser => 
@@ -67,8 +67,7 @@ async function load_page(url,id,i_count,wait_time){
           browser.on('targetcreated', async function(target){    
         
             if(target._targetInfo.type=='page'){
-              var p = await target.page()   
-                          
+              var p = await target.page()                
               p.once('load',  async function(){
                 try{
                     console.log('New Page Loaded @ '+new Date(Date.now()).toLocaleString())
@@ -77,11 +76,9 @@ async function load_page(url,id,i_count,wait_time){
                     url = new URL(current_url);
                     console.log('Current Url :: '+url)
                     await timer(3000)
-                    await p.keyboard.down('Shift')
-                    await p.keyboard.press('Escape')
-                    await p.keyboard.up('Shift') 
                     
-                    await timer(6000)
+                    
+                    // await timer(6000)
                     await p.addScriptTag({ url: 'https://unpkg.com/gremlins.js' });
                     console.log('Script injected @ '+new Date(Date.now()).toLocaleString())
                     await p.evaluate(() => {
@@ -93,8 +90,14 @@ async function load_page(url,id,i_count,wait_time){
                     }).unleash()
                     });
                     await setTimeout(async function() {
-                      await p.reload({waitUntil:['networkidle0', 'domcontentloaded'] })
-                      console.log('page reloaded')
+                      try{              
+                        await p.reload({waitUntil:['networkidle0', 'domcontentloaded'],timeout:900000 })
+                        console.log('page reloaded')                
+                      }
+                      catch(e){
+                        console.log('timeout')
+                      }  
+                      
                       try{
                         await context.overridePermissions(url.origin, ['notifications']);
                         await timer(6000)
@@ -130,12 +133,10 @@ async function load_page(url,id,i_count,wait_time){
           //await page.setViewport({ width, height })
 
           // Open Task Manager to record task usage
-          await timer(3000)
           await page.keyboard.down('Shift')
           await page.keyboard.press('Escape')
           await page.keyboard.up('Shift')
           console.log('open task manager')
-          await timer(3000)
           const context = browser.defaultBrowserContext();
           await page.setBypassCSP(true)
           
