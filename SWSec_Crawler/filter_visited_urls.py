@@ -2,7 +2,7 @@ import os
 import pandas as pd 
 
 dir_path = './demo_code/demo_logs/'
-csv_file_path = '../SWSec_Data/crawl_sites_sw.csv'
+csv_file_path = './data/crawl_sites_sw.csv'
 
 url_ids = []
 
@@ -52,17 +52,17 @@ def filter_notification_requests():
 
         urls = fetch_urls_from_file()
                 
-        dir_path = './sw_sec_containers_data/'  
+        dir_path = './crawl_containers_data/'  
         
         for id,url in urls.items():
                 if 'Alexa' not in id:
                         continue
                 try:
-                        id = 'container_Ana_'+id
+                        cont_id = 'container_'+id
                         # print(url)
-                        if os.path.exists(dir_path+id+'/'):
+                        if os.path.exists(dir_path+cont_id+'/'):
                                 # print(id,url)
-                                log_tar_dir = dir_path+id+'/chrome_log_0.tar'
+                                log_tar_dir = dir_path+cont_id+'/chrome_log_0.tar'
                                 t = tarfile.open(log_tar_dir,'r')
                                 chrome_log_file = 'chrome_debug.log'
                                 if chrome_log_file in t.getnames():
@@ -70,12 +70,15 @@ def filter_notification_requests():
                                         data = f.read()
                                         res = data.find('=registerServiceWorker')
                                         
-                                        res2 = data.find('=requestNotification')
+                                        res2 = data.find('=RequestPermission')
                                         if res >-1:
-                                                print('Found SW  :: ', id)
+                                                print('Found SW  :: ', cont_id)
                                         if res2 >-1:
-                                                print('Found Notification Request :: ', id)
+                                                print('Found Notification Request :: ', cont_id)
+                                                with open('./data/filtered_sw_urls.csv','a+') as f:
+                                                        f.write(id+','+url+'\n')
                 except Exception as e:
+                        print(e)
                         continue
 
 filter_notification_requests()

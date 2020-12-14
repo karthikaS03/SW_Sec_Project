@@ -5,7 +5,7 @@ import datetime
 from docker_config import *
 
 
-client = docker.from_env(timeout=(3600*24))
+client = docker.from_env(timeout=(3600*72))
 export_path = CONFIG_EXPORT_PATH
 
 
@@ -88,7 +88,8 @@ def resume_container(url, id, script_name, iteration_count, container_timeout):
 
 def export_container_logs(id,count):
     try:
-        print(export_path)
+        # print(export_path)
+        print('Exporting Container :: '+id)
         container = client.containers.get('container_'+str(id))
         get_logger('container_'+id).info(get_time() + 'container_'+id+'exporting files!!')
         dir_path = export_path+'container_'+id+'/'

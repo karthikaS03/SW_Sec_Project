@@ -3,7 +3,7 @@ import os
 project_dir = os.getcwd()
 
 #Docker
-docker_image = 'sw_sec_chromium:pwa'
+docker_image = 'dockerammu/sw_sec_chromium:pwa2'
 docker_user = 'pptruser'
 docker_container_home = '/home/pptruser/'
 docker_shared_dir_root = project_dir
@@ -21,18 +21,18 @@ collection_script   = 'run_chromium.js'
 CRAWL_MAX_CONTAINERS = 10
 CRAWL_TIMEOUT = 300
 ANALYSIS_MAX_CONTAINERS = 50
-ANALYSIS_TIMEOUT = 3600 * 2  # 900 ->15 mins
+ANALYSIS_TIMEOUT = 3600 * 72  # 900 ->15 mins
 
 
 # CONFIG_EXPORT_PATH = './containers_data/'
 
 CRAWL_URL_PATH = '../SWSec_Data/top_sites2.json' #'../SWSec_Data/navigatorserviceworkerregister.csv'
-ANALYSIS_URL_PATH = '../SWSec_Data/top_sites2.json'
+ANALYSIS_URL_PATH = './data/filtered_sw_urls.csv'
 
 ###
 # To be changed as needed
 ###
-CRAWL_SW = True
+CRAWL_SW = False
 IS_MALICIOUS = False
 
 if CRAWL_SW ==True:

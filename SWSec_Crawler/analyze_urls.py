@@ -60,7 +60,7 @@ def process_urls_parallel(analysis_urls, script_file, cont_timeout, max_cont):
 				url = itm['url']
 				# print(url)
 				visit_count = itm['count']
-				if i!=0 and i%20==0:
+				if i!=0 and i%5==0:
 					time.sleep(200)
 				if visit_count==0:
 					## initiates docker container for the first time
@@ -85,7 +85,7 @@ def process_urls_parallel(analysis_urls, script_file, cont_timeout, max_cont):
 							
 					# export_container_logs(id, v_count)	
 
-					if sw_found_pwa(id,v_count):						
+					if sw_found_pwa(id,v_count) and CRAWL_SW==True:						
 						print('sw found', id)
 						with open('./data/crawl_sites_sw.csv','a+') as f:
 							f.write(id+','+url+',0\n')
@@ -105,7 +105,7 @@ def process_urls_parallel(analysis_urls, script_file, cont_timeout, max_cont):
 						get_logger('container_'+id).info(exc)			
 							
 					export_container_logs(id, v_count)	
-					if sw_found_pwa(id,v_count):
+					if sw_found_pwa(id,v_count) and CRAWL_SW==True:
 						with open('./data/crawl_sites_sw.csv','a+') as f:
 							f.write(id+','+url+',0\n')
 					stop_container(id)
@@ -143,13 +143,13 @@ def fetch_urls_with_notifications(count=100):
 			for row in csvreader:
 				# print(row)
 				i +=1
-				if  not row['id'].isdigit():
-					continue 
+				# if  not row['id'].isdigit():
+				# 	continue 
 				
 				id = id_prefix + str(row['id'])
 				url = row['url']
-				if int(row['id']) >3000000:
-					crawl_urls[id] = {'url':url, 'count':0}
+				# if int(row['id']) >3000000:
+				crawl_urls[id] = {'url':url, 'count':0}
 				
 	elif '.json' in urls_path:
 		with open(urls_path,'r') as o:
