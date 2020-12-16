@@ -90,9 +90,9 @@ def get_next_node_info():
                     elif entries['func_name']  == PROCESS_TASK_USAGE_METHOD:
                         parse_task_usage(timestamp, entries)
                 return node_id,timestamp, proc_id, entries
-            elif 'INFO:CONSOLE' in line :                
-                with open('./demo_results/miner2_responses.txt','a+') as rf:
-                    rf.write(line)
+            #elif 'INFO:CONSOLE' in line :                
+            #    with open('./demo_results/miner2_responses.txt','a+') as rf:
+            #        rf.write(line)
     except Exception as ex:
             print(ex)
 
@@ -117,73 +117,75 @@ def plot_task_usage(id):
     df = pd.DataFrame(process_task_usage)
     # print(df.head())
     if not df.empty :
-    
-        print(min(df['timestamp']),max(df['timestamp']))
-        min_time = _truncate_time_to_sec(min(df['timestamp']))
-        max_time = _truncate_time_to_sec(max(df['timestamp']))
-        
-        _, axes = plt.subplots(nrows=3, ncols=1, figsize=(8,10))
-        df_proc_cpu = pd.DataFrame()
-        df_proc_mem = pd.DataFrame()
-        process_titles = df['title'].unique()
-        # print(process_titles)
-        for proc in process_titles:
+        try:
+            print(min(df['timestamp']),max(df['timestamp']))
+            min_time = _truncate_time_to_sec(min(df['timestamp']))
+            max_time = _truncate_time_to_sec(max(df['timestamp']))
             
-            if not any(p in proc for p in FOCUSSED_PROCESS_TAGS) or any(p in proc for p in ['about: blank','chrome', 'New Tab']):
-                continue
-            
-            try:                                               
-                df_proc_filtered = df[df['title']==proc]            
-                df_proc_filtered = df_proc_filtered.drop(columns=['title'])
-                df_proc_filtered['timestamp'] = [_truncate_time_to_sec(t) for t in df_proc_filtered['timestamp']]
-                df_proc_filtered = df_proc_filtered.groupby('timestamp').max()
-                df_proc_filtered = df_proc_filtered.reset_index()
-                df_proc_filtered = df_proc_filtered.drop_duplicates()     
+            _, axes = plt.subplots(nrows=3, ncols=1, figsize=(8,10))
+            df_proc_cpu = pd.DataFrame()
+            df_proc_mem = pd.DataFrame()
+            process_titles = df['title'].unique()
+            # print(process_titles)
+            for proc in process_titles:
                 
-                att = df_proc_filtered.set_index('timestamp')                
-                att = att.astype('float')            
-                idx = pd.date_range(min_time, max_time, freq='S')
-                date_reidx = att.reindex(idx)
-                if 'http' in proc and ':' in proc:
-                    proc = proc.split(':')[0] + ' : ' + (proc.split(':')[2]).split('/')[2]
-                cpu_name = 'CPU :: '+ proc
-                mem_name = 'Mem :: '+ proc
-                date_reidx[cpu_name] = date_reidx['cpu']
-                date_reidx[mem_name] = date_reidx['memory']
-                if len(df_proc_cpu)==0:
-                    df_proc_cpu = pd.DataFrame(date_reidx[cpu_name].copy())   
-                    df_proc_mem = pd.DataFrame(date_reidx[mem_name].copy()) 
-                else:
-                    df_proc_cpu[cpu_name] = pd.DataFrame(date_reidx[cpu_name].copy())   
-                    df_proc_mem[mem_name] = pd.DataFrame(date_reidx[mem_name].copy()) 
-            except Exception as e:
-                print(e)
-                continue
-        # df_proc_cpu.to_csv('proc_cpu.csv')
-        # df_proc_mem.to_csv('proc_mem_csv')
-        
-        
-        
-        box = axes[0].get_position()
-        print(box)
-        # axes[0].set_position([box.x0,0.45,box.width,box.height*0.90])
-        df_proc_cpu.plot(ax=axes[0], kind='line', title = 'CPU Usage', 
-                    legend=True).legend(loc='upper center',
-                    #  bbox_to_anchor=(0.02,1.5),
-                     ncol=2,prop={'size':6})
-        
-        box = axes[1].get_position()
-        print(box)
-        # axes[1].set_position([box.x0,box.y0,box.width,box.height*0.80])
-        df_proc_mem.plot(ax=axes[1], kind='line', title = 'Memory Usage', 
-                        legend=True).legend(loc= 'upper center', 
-                        # bbox_to_anchor=(0.02,1.5),
+                if not any(p in proc for p in FOCUSSED_PROCESS_TAGS) or any(p in proc for p in ['about: blank','chrome', 'New Tab']):
+                    continue
+                
+                try:                                               
+                    df_proc_filtered = df[df['title']==proc]            
+                    df_proc_filtered = df_proc_filtered.drop(columns=['title'])
+                    df_proc_filtered['timestamp'] = [_truncate_time_to_sec(t) for t in df_proc_filtered['timestamp']]
+                    df_proc_filtered = df_proc_filtered.groupby('timestamp').max()
+                    df_proc_filtered = df_proc_filtered.reset_index()
+                    df_proc_filtered = df_proc_filtered.drop_duplicates()     
+                    
+                    att = df_proc_filtered.set_index('timestamp')                
+                    att = att.astype('float')            
+                    idx = pd.date_range(min_time, max_time, freq='S')
+                    date_reidx = att.reindex(idx)
+                    if 'http' in proc and ':' in proc:
+                        proc = proc.split(':')[0] + ' : ' + (proc.split(':')[2]).split('/')[2]
+                    cpu_name = 'CPU :: '+ proc
+                    mem_name = 'Mem :: '+ proc
+                    date_reidx[cpu_name] = date_reidx['cpu']
+                    date_reidx[mem_name] = date_reidx['memory']
+                    if len(df_proc_cpu)==0:
+                        df_proc_cpu = pd.DataFrame(date_reidx[cpu_name].copy())   
+                        df_proc_mem = pd.DataFrame(date_reidx[mem_name].copy()) 
+                    else:
+                        df_proc_cpu[cpu_name] = pd.DataFrame(date_reidx[cpu_name].copy())   
+                        df_proc_mem[mem_name] = pd.DataFrame(date_reidx[mem_name].copy()) 
+                except Exception as e:
+                    print(e)
+                    continue
+            # df_proc_cpu.to_csv('proc_cpu.csv')
+            # df_proc_mem.to_csv('proc_mem_csv')
+            
+            
+            
+            box = axes[0].get_position()
+            print(box)
+            # axes[0].set_position([box.x0,0.45,box.width,box.height*0.90])
+            df_proc_cpu.plot(ax=axes[0], kind='line', title = 'CPU Usage', 
+                        legend=True).legend(loc='upper center',
+                        #  bbox_to_anchor=(0.02,1.5),
                         ncol=2,prop={'size':6})
-         
-        # plt.legend( bbox_to_anchor=(0,2,1,100),mode='expand')
-        
-        # plt.show()             
-        return axes, min_time,max_time
+            
+            box = axes[1].get_position()
+            print(box)
+            # axes[1].set_position([box.x0,box.y0,box.width,box.height*0.80])
+            df_proc_mem.plot(ax=axes[1], kind='line', title = 'Memory Usage', 
+                            legend=True).legend(loc= 'upper center', 
+                            # bbox_to_anchor=(0.02,1.5),
+                            ncol=2,prop={'size':6})
+            
+            # plt.legend( bbox_to_anchor=(0,2,1,100),mode='expand')
+            
+            # plt.show()             
+            return axes, min_time,max_time
+        except Exception as e:
+            return None
     return None                     
         
 def draw_sw_graph(id):
@@ -236,7 +238,7 @@ def draw_sw_graph(id):
 
                 if  label in START_END_EVENT_MAPS:
                     start_nodes.append((node_id,timestamp,proc_id))  
-                    print('Start Node :: ',label, proc_id, node_id)
+                    #print('Start Node :: ',label, proc_id, node_id)
                     if 'service_worker_url' in entries:
                         sw_events_info.append({
                                     'timestamp'  : timestamp,
@@ -249,13 +251,13 @@ def draw_sw_graph(id):
                 elif is_end_node:       
                     st_node_id, st_timestamp, st_proc_id = start_nodes.pop(prev_node_idx)
                     st_node = G.get_node(st_node_id) 
-                    print('End Node :: ',st_node.attr['label'],label,st_proc_id)           
+                    #print('End Node :: ',st_node.attr['label'],label,st_proc_id)           
                     st_node.attr['label'] = st_node.attr['label'] + ' (' +str((timestamp-st_timestamp).total_seconds()) + ')'
                     # print(st_node.attr['label'],label,st_proc_id)
                     G.remove_node(node_id)
                     is_edge=False
-                else:
-                    print('\t Node :: ',label, proc_id, node_id)
+                #else:
+                #    print('\t Node :: ',label, proc_id, node_id)
                 if is_edge:
                     G.add_edge(prev_node_id, node_id)
                     
@@ -297,14 +299,14 @@ def plot_sw_events(plt_det):
     for sw_url in sw_urls:
         
         try:                                               
-            df_events_filtered = df_events[df_events['sw_url']==sw_url]            
+            df_events_filtered = df_events[df_events['sw_url']==sw_url]
             df_events_filtered = df_events_filtered.drop(columns=['sw_url'])
             df_events_filtered['timestamp'] = [_truncate_time_to_sec(t) for t in df_events_filtered['timestamp']]
             df_events_filtered = df_events_filtered.groupby('timestamp')['event_name'].apply(lambda ev : '--'.join(set(ev)))
             df_events_filtered = df_events_filtered.reset_index()
             df_events_filtered = df_events_filtered.drop_duplicates()     
             print(df_events_filtered.head())
-                           
+                    
             # df_events_filtered['timestamp'] = df_events_filtered['timestamp'].astype('float')  
             att = df_events_filtered.set_index('timestamp')           
             idx = pd.date_range(min_time, max_time, freq='S')
@@ -315,19 +317,19 @@ def plot_sw_events(plt_det):
             date_reidx = date_reidx.reset_index()            
             date_reidx['y'] = date_reidx['event_name'].apply(lambda x: y_point if len(str(x))>3 else -1) 
             y_point += 15
-            
+
 
             fig = date_reidx.plot('index','y' ,ax=axes[2], kind='line', style='.',
-                        legend=True).legend(loc= 'upper center', 
-                        # bbox_to_anchor=(0.02,1.5),
-                        ncol=2,prop={'size':4},)
-            
-            # for i,row in date_reidx.iterrows():
-            #     # break
-            #     if row['y']>0:
-            #         axes[2].annotate(xy=(row['index'], row['y']), s=row['event_name'], ha='left', rotation=90, position=(row['index'],row['y']-10))
+                legend=True).legend(loc= 'upper center', 
+                # bbox_to_anchor=(0.02,1.5),
+                ncol=2,prop={'size':4},)
 
-            
+            for i,row in date_reidx.iterrows():
+                # break
+                if row['y']>0:
+                    axes[2].annotate(xy=(row['index'], row['y']), s=row['event_name'], ha='left', rotation=90, position=(row['index'],row['y']-10))
+
+
         
         except Exception as e:
             print(e)
@@ -341,7 +343,7 @@ def plot_sw_events(plt_det):
 if __name__ == "__main__":
     import tarfile
     import os
-    test = True
+    test = False
     
     sw_events_info = []
 
@@ -369,7 +371,7 @@ if __name__ == "__main__":
 
     for dir in os.listdir(log_dir_path):
         log_path = os.path.join(log_dir_path,dir)  
-        if 'M_' not in dir:
+        if 'Ana_' not in dir:# or '3102' not in dir:
             continue      
         for tar_file in os.listdir(log_path):
             if 'chrome_log' in tar_file :
@@ -381,6 +383,8 @@ if __name__ == "__main__":
                 }
                 id = "{}_{}".format(dir.replace('container_',''),tar_file.replace('chrome_log_','')) 
                 id = id.replace('.tar','')
+                if os.path.exists('./plots/'+id+'_proc_usage.pdf'):
+                    continue
                 # print(id)
                 # if id != 'M134_0':
                 #     continue
