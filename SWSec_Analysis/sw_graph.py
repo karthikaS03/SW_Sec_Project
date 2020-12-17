@@ -4,6 +4,11 @@ from parse_logs.parse_utils import *
 import pandas as pd 
 import matplotlib.pyplot as plt
 
+
+from database import db_operations
+
+dbo = db_operations.DBOperator()
+
 LOG_FILE = None
 
 NODE_LOG_CALLS = set(['LogSWInfo', 'LogSWEvent', 'LogSWContextInfo', 'LogNotificationData', 'DidCallFunction' ,                        ])
@@ -100,10 +105,16 @@ def parse_task_usage(timestamp,log_entries):
     global process_task_usage
     # print(log_entries)
     if 'process_title' in log_entries:
-        process_task_usage['title'].append(log_entries['process_title'])
-        process_task_usage['cpu'].append(float(log_entries['process_cpu']))
-        process_task_usage['memory'].append(float(log_entries['process_memory']))
+        task_usage_info = {'title': log_entries['process_title'], 'cpu': float(log_entries['process_cpu']),
+                            'memory': float(log_entries['process_memory']), 'timestamp': timestamp}
+
+        process_task_usage['title'].append(task_usage_info['title'])
+        process_task_usage['cpu'].append(task_usage_info['cpu'])
+        process_task_usage['memory'].append(task_usage_info['memory'])
         process_task_usage['timestamp'].append(timestamp)
+        
+        # dbo.update_process_task_usage_table(CONTAINER_ID, task_usage_info)
+
 
 def _truncate_time_to_sec(t):
     
@@ -240,11 +251,17 @@ def draw_sw_graph(id):
                     start_nodes.append((node_id,timestamp,proc_id))  
                     #print('Start Node :: ',label, proc_id, node_id)
                     if 'service_worker_url' in entries:
-                        sw_events_info.append({
+                        sw_info = {
                                     'timestamp'  : timestamp,
                                     'sw_url'     : entries['service_worker_url'], 
                                     'event_name' : entries['func_name']                                     
-                        })
+                        }
+                        sw_events_info.append(sw_info)
+                    
+                        dbo.update_sw_events_info_table(CONTAINER_ID, sw_info)
+
+                    node_info = {'label': label, 'st_node_id': str(node_id), 'timestamp': timestamp, 'process_id': int(proc_id.split('[')[1]) }
+                    dbo.update_sw_event_duration_table(CONTAINER_ID, node_info)
                     # print('\tStartNode :: ',label)
                     # print(start_nodes[-1])       
                                             
@@ -254,6 +271,10 @@ def draw_sw_graph(id):
                     #print('End Node :: ',st_node.attr['label'],label,st_proc_id)           
                     st_node.attr['label'] = st_node.attr['label'] + ' (' +str((timestamp-st_timestamp).total_seconds()) + ')'
                     # print(st_node.attr['label'],label,st_proc_id)
+
+                    node_info = {'label': label, 'st_node_id': str(st_node_id), 'timestamp': timestamp, 'process_id': int(proc_id.split('[')[1]) }
+                    dbo.update_sw_event_duration_table(CONTAINER_ID, node_info)
+
                     G.remove_node(node_id)
                     is_edge=False
                 #else:
@@ -346,7 +367,7 @@ if __name__ == "__main__":
     test = False
     
     sw_events_info = []
-
+    CONTAINER_ID = ''
     if test:
         process_task_usage = {
                         'title':[],
@@ -374,32 +395,34 @@ if __name__ == "__main__":
         if 'Ana_' not in dir:# or '3102' not in dir:
             continue      
         for tar_file in os.listdir(log_path):
-            if 'chrome_log' in tar_file :
-                process_task_usage = {
-                        'title':[],
-                        'cpu':[],
-                        'memory':[],
-                        'timestamp':[]
-                }
-                id = "{}_{}".format(dir.replace('container_',''),tar_file.replace('chrome_log_','')) 
-                id = id.replace('.tar','')
-                if os.path.exists('./plots/'+id+'_proc_usage.pdf'):
-                    continue
-                # print(id)
-                # if id != 'M134_0':
-                #     continue
-                log_tar_dir = os.path.join(log_path,tar_file)
-                t = tarfile.open(log_tar_dir,'r')
-                LOG_FILE = t.extractfile('chrome_debug.log') 
-                print(LOG_FILE)               
-                # LOG_FILE = open('../../sw_Sec.log','r')
-                G = pgv.AGraph(directed=True, strict=True, ranksep='1',node_sep='2')
-                draw_sw_graph(id)
-                # plot_task_usage(id)
-                plt_det = plot_task_usage(id)
-                plot_sw_events(plt_det)
-                plt.tight_layout() 
-                plt.savefig('./plots/'+id+'_proc_usage.pdf')
-                # exit()
-                
+            try:
+                if 'chrome_log' in tar_file :
+                    process_task_usage = {
+                            'title':[],
+                            'cpu':[],
+                            'memory':[],
+                            'timestamp':[]
+                    }
+                    id = "{}_{}".format(dir.replace('container_',''),tar_file.replace('chrome_log_','')) 
+                    id = id.replace('.tar','')
+                    CONTAINER_ID = id
+                    if os.path.exists('./plots/'+id+'_proc_usage.pdf'):
+                        continue
+                    
+                    log_tar_dir = os.path.join(log_path,tar_file)
+                    t = tarfile.open(log_tar_dir,'r')
+                    LOG_FILE = t.extractfile('chrome_debug.log') 
+                    print(LOG_FILE)               
+                    # LOG_FILE = open('../../sw_Sec.log','r')
+                    G = pgv.AGraph(directed=True, strict=True, ranksep='1',node_sep='2')
+                    draw_sw_graph(id)
+                    # plot_task_usage(id)
+                    plt_det = plot_task_usage(id)
+                    plot_sw_events(plt_det)
+                    plt.tight_layout() 
+                    plt.savefig('./plots/'+id+'_proc_usage.pdf')
+                    # exit()
+            except Exception as e:
+                continue
+                    
     
