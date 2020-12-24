@@ -116,6 +116,9 @@ def process_urls_parallel(analysis_urls, script_file, cont_timeout, max_cont):
 					if sw_found_pwa(id,v_count) and CRAWL_SW==True:
 						with open('./data/crawl_sites_sw.csv','a+') as f:
 							f.write(id+','+url+',0\n')
+					else:
+						rank = id.split('_')[-1]
+						dbo.update_alexa_sites_table(rank, None, 'is_crawled', 'False')
 					stop_container(id)
 								
 	return processed_url_ids
@@ -197,31 +200,31 @@ def fetch_urls_with_notifications(count=100):
 	
 
 def process_urls_with_notifications():	
+	while True:
+		notification_urls  =  fetch_urls_from_db(max_containers) #fetch_urls_with_notifications()
+		notification_urls_keys = sorted(notification_urls.keys(), key = lambda x: int(x.split('_')[-1]))
 
-	notification_urls  =  fetch_urls_from_db(max_containers) #fetch_urls_with_notifications()
-	notification_urls_keys = sorted(notification_urls.keys(), key = lambda x: int(x.split('_')[-1]))
+		print('started processing')
+		print(len(notification_urls))	
+		print(notification_urls_keys[:5])
+		for i in range(0,len(notification_urls),max_containers):	
 
-	print('started processing')
-	print(len(notification_urls))	
-	print(notification_urls_keys[:5])
-	for i in range(0,len(notification_urls),max_containers):	
-
-		notification_urls_set = {k:notification_urls[k] for k in notification_urls_keys[i:i+max_containers]}
-		while notification_urls_set:			
-			processed_ids = process_urls_parallel(notification_urls_set, collection_script, container_timeout, max_containers)		
-			## Retain only those containers that requested notifications
-			notification_urls_set = {id:info for id,info in notification_urls_set.items() if info['count']>0 or id in processed_ids}
-			for key in notification_urls_set.keys():
-				itm = notification_urls_set[key]							
-				if itm['count'] == iteration_count:
-					## Resume each container `iteration_count` number of times
-					notification_urls_set.pop(key)
-					notification_urls.pop(key)
-				else:
-					itm['count'] = itm['count']+1
-			if len(client.containers.list())>30:
-				print('docker pruning started!!')
-				docker_prune()
+			notification_urls_set = {k:notification_urls[k] for k in notification_urls_keys[i:i+max_containers]}
+			while notification_urls_set:			
+				processed_ids = process_urls_parallel(notification_urls_set, collection_script, container_timeout, max_containers)		
+				## Retain only those containers that requested notifications
+				notification_urls_set = {id:info for id,info in notification_urls_set.items() if info['count']>0 or id in processed_ids}
+				for key in notification_urls_set.keys():
+					itm = notification_urls_set[key]							
+					if itm['count'] == iteration_count:
+						## Resume each container `iteration_count` number of times
+						notification_urls_set.pop(key)
+						notification_urls.pop(key)
+					else:
+						itm['count'] = itm['count']+1
+				if len(client.containers.list())>30:
+					print('docker pruning started!!')
+					docker_prune()
 
 		
 def main():

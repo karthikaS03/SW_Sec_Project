@@ -3,6 +3,12 @@ import os
 import time
 import datetime
 from docker_config import *
+import sys
+sys.path.append("../SWSec_Analysis/database")
+
+import db_operations
+
+dbo = db_operations.DBOperator()
 
 if CRAWL_SW ==True:
     client = docker.from_env(timeout=(CRAWL_TIMEOUT))
@@ -10,8 +16,6 @@ else:
     client = docker.from_env(timeout=(ANALYSIS_TIMEOUT))
 
 export_path = CONFIG_EXPORT_PATH
-
-
 
     # logging.basicConfig(name = name , filename=name +'.log', filemode='w', ,level=logging.INFO)
 
@@ -50,6 +54,11 @@ def execute_script(url, id, script_name,  iteration_count, container_timeout):
         for log in logs:
             # print('Container_'+id+' :: LOG :: '+log)
             get_logger('container_'+id).info('Container_'+id+' :: LOG :: '+log)
+            if  'trying to connect to Chrome' in log and 'TimeoutError' in log:
+                if CRAWL_SW:
+                    dbo.update_alexa_sites_table(id.split('_')[-1], None, 'is_crawled', 'False')
+                else:
+                    dbo.update_alexa_sites_table(id.split('_')[-1], None, 'is_analyzed', 'False')
         # print('timeout started')
         # time.sleep(container_timeout) 
         get_logger('container_'+id).info(get_time() +'container_'+id+': Execution complete!!')	

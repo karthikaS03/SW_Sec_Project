@@ -7,6 +7,7 @@ else:
     from config import *
 
 import sys
+from datetime import datetime
 
 
 class DBOperator:
@@ -74,15 +75,18 @@ class DBOperator:
             print('ERROR :: Database ', e)
 
     def update_alexa_sites_table(self, site_rank, site_url, column_name, column_val):
-       
+        query= """ UPDATE alexa_sites SET """+ column_name +""" = """+ column_val
         try:
+            if column_name == 'is_crawled':
+                query = query + """, crawl_timestamp = '%s'""" % (datetime.now())
+            elif column_name =='is_analyzed':
+                query = query + """, analysis_timestamp = '%s'""" % (datetime.now())
+
             if site_rank == None:
-                query = """
-                        UPDATE alexa_sites SET """+ column_name +""" = """+ column_val+ """
+                query = query + """ 
                         WHERE site_url LIKE '%"""+ site_url +"""%' """
             else:
-                query = """
-                        UPDATE alexa_sites SET """+ column_name +""" = """+ column_val+ """
+                query = query + """ 
                         WHERE rank = %s """ % (site_rank)
             # print(query)
             self.cursor.execute(query)
