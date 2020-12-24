@@ -4,8 +4,11 @@ import time
 import datetime
 from docker_config import *
 
+if CRAWL_SW ==True:
+    client = docker.from_env(timeout=(CRAWL_TIMEOUT))
+else:
+    client = docker.from_env(timeout=(ANALYSIS_TIMEOUT))
 
-client = docker.from_env(timeout=(3600*72))
 export_path = CONFIG_EXPORT_PATH
 
 
@@ -108,6 +111,7 @@ def export_container_logs(id,count):
 
     except Exception as e:
         get_logger('container_'+id).info('Export Container:: Exception!!')
+        get_logger('container_'+id).info(e)
     
 def sw_found_pwa(id, count):
     try:

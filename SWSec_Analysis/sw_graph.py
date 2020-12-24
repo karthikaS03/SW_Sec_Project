@@ -406,7 +406,7 @@ if __name__ == "__main__":
                     id = "{}_{}".format(dir.replace('container_',''),tar_file.replace('chrome_log_','')) 
                     id = id.replace('.tar','')
                     CONTAINER_ID = id
-                    if os.path.exists('./plots/'+id+'_proc_usage.pdf'):
+                    if os.path.exists('./plots/'+id+'_proc_usage.pdf') or '_848' in id or '_189' in id:
                         continue
                     
                     log_tar_dir = os.path.join(log_path,tar_file)

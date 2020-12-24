@@ -1,7 +1,10 @@
 import psycopg2
 from datetime import datetime
-
-from .config import *
+import sys
+if sys.version_info > (2,8):
+    from .config import *
+else:
+    from config import *
 
 import sys
 
@@ -22,6 +25,19 @@ class DBOperator:
     def bye(self,):
         self.cursor.close()
         self.conn.close()
+
+    def get_seed_urls(self,is_crawl, count=10):
+        if is_crawl:
+            query = """
+            SELECT rank, site_url FROM alexa_sites WHERE is_crawled is NULL  
+            LIMIT %s
+            """ %(count)
+        else:
+            query = """
+            SELECT rank, site_url FROM alexa_sites WHERE is_crawled=True AND is_sw_found=True AND has_notification_request=True LIMIT %s
+            """ %(count)
+        self.cursor.execute(query)
+        return [x for x in self.cursor.fetchall()]
 
     def update_sw_events_info_table(self, container_id, sw_event_info):
         try:
@@ -46,6 +62,33 @@ class DBOperator:
         except Exception as e:
             print('ERROR :: Database ', e)
 
+    def insert_alexa_sites_table(self, site_url, site_rank):
+       
+        try:
+            self.cursor.execute(
+            """
+            INSERT INTO alexa_sites (site_url, rank)
+            VALUES (%s, %s)""",
+            (site_url, site_rank))
+        except Exception as e:
+            print('ERROR :: Database ', e)
+
+    def update_alexa_sites_table(self, site_rank, site_url, column_name, column_val):
+       
+        try:
+            if site_rank == None:
+                query = """
+                        UPDATE alexa_sites SET """+ column_name +""" = """+ column_val+ """
+                        WHERE site_url LIKE '%"""+ site_url +"""%' """
+            else:
+                query = """
+                        UPDATE alexa_sites SET """+ column_name +""" = """+ column_val+ """
+                        WHERE rank = %s """ % (site_rank)
+            # print(query)
+            self.cursor.execute(query)
+            
+        except Exception as e:
+            print('ERROR :: Database ', e)
 
     def update_sw_event_duration_table(self, container_id, node_info):
         try:

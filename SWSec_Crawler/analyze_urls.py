@@ -6,6 +6,10 @@ import time
 import datetime
 import os
 import json 
+import sys
+sys.path.append("../SWSec_Analysis/database")
+
+import db_operations
 
 # from docker_config import *
 from docker_monitor import *
@@ -18,6 +22,7 @@ from docker_monitor import *
 # logging.basicConfig(filename='output_new.log', filemode='w', format='%(name)s - %(levelname)s - %(message)s',level=logging.INFO)
 
 client = docker.from_env()
+dbo = db_operations.DBOperator()
 
 container_timeout = 300
 urls_path = '' 
@@ -60,8 +65,8 @@ def process_urls_parallel(analysis_urls, script_file, cont_timeout, max_cont):
 				url = itm['url']
 				# print(url)
 				visit_count = itm['count']
-				if i!=0 and i%5==0:
-					time.sleep(200)
+				if i!=0 and i%3==0:
+					time.sleep(120)
 				if visit_count==0:
 					## initiates docker container for the first time
 					futures[executor.submit(initiate_container, url, str(id), script_file, visit_count, cont_timeout)] = (str(id),visit_count, url)		
@@ -89,6 +94,9 @@ def process_urls_parallel(analysis_urls, script_file, cont_timeout, max_cont):
 						print('sw found', id)
 						with open('./data/crawl_sites_sw.csv','a+') as f:
 							f.write(id+','+url+',0\n')
+						rank = id.split('_')[-1] 
+						dbo.update_alexa_sites_table(rank, None, 'is_sw_found', 'True')
+
 					stop_container(id)
 					
 					processed_url_ids.add(id)	
@@ -117,6 +125,27 @@ def stop_running_containers():
 		print (c)			
 		c.stop()
 		c.remove()
+
+def fetch_urls_from_db(count=0):
+	if count>0:
+		print('Fetching URLS ::'+str(count))
+		#results = api_requests.fetch_urls_api(count,'true','true')
+		results = dbo.get_seed_urls(CRAWL_SW, count)
+		crawl_urls={}
+		for item in results:
+			
+			id = id_prefix + str(item[0])
+			url = item[1]			
+			crawl_urls[str(id)]={'url': url,'count':0}
+			
+			if CRAWL_SW:
+				dbo.update_alexa_sites_table(item[0], None,'is_crawled','True')
+			else:
+				dbo.update_alexa_sites_table(item[0], None,'is_analyzed','True')
+			
+		return crawl_urls
+	return {}
+
 
 def fetch_urls_with_notifications(count=100):
 
@@ -148,8 +177,10 @@ def fetch_urls_with_notifications(count=100):
 				
 				id = id_prefix + str(row['id'])
 				url = row['url']
-				# if int(row['id']) >3000000:
-				crawl_urls[id] = {'url':url, 'count':0}
+				if int(row['id'].split('_')[2]) <4000:
+					if (os.path.exists('./sw_sec_containers_data/container_'+id)):
+						continue
+					crawl_urls[id] = {'url':url, 'count':0}
 				
 	elif '.json' in urls_path:
 		with open(urls_path,'r') as o:
@@ -167,15 +198,15 @@ def fetch_urls_with_notifications(count=100):
 
 def process_urls_with_notifications():	
 
-	notification_urls  =  fetch_urls_with_notifications()
+	notification_urls  =  fetch_urls_from_db(max_containers) #fetch_urls_with_notifications()
 	notification_urls_keys = sorted(notification_urls.keys(), key = lambda x: int(x.split('_')[-1]))
 
 	print('started processing')
 	print(len(notification_urls))	
 	print(notification_urls_keys[:5])
-	for i in range(0,len(notification_urls),100):	
+	for i in range(0,len(notification_urls),max_containers):	
 
-		notification_urls_set = {k:notification_urls[k] for k in notification_urls_keys[i:i+100]}
+		notification_urls_set = {k:notification_urls[k] for k in notification_urls_keys[i:i+max_containers]}
 		while notification_urls_set:			
 			processed_ids = process_urls_parallel(notification_urls_set, collection_script, container_timeout, max_containers)		
 			## Retain only those containers that requested notifications
@@ -188,9 +219,9 @@ def process_urls_with_notifications():
 					notification_urls.pop(key)
 				else:
 					itm['count'] = itm['count']+1
-		if len(client.containers.list())>30:
-			print('docker pruning started!!')
-			docker_prune()
+			if len(client.containers.list())>30:
+				print('docker pruning started!!')
+				docker_prune()
 
 		
 def main():
