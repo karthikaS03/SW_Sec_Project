@@ -1,5 +1,11 @@
 import os
 import pandas as pd 
+import sys
+sys.path.append("../SWSec_Analysis/database")
+
+import db_operations
+
+dbo = db_operations.DBOperator()
 
 dir_path = './demo_code/demo_logs/'
 csv_file_path = './data/crawl_sites_sw.csv'
@@ -61,7 +67,7 @@ def filter_notification_requests():
                         cont_id = 'container_'+id
                         # print(url)
                         if os.path.exists(dir_path+cont_id+'/'):
-                                # print(id,url)
+                                print(id,url)
                                 log_tar_dir = dir_path+cont_id+'/chrome_log_0.tar'
                                 t = tarfile.open(log_tar_dir,'r')
                                 chrome_log_file = 'chrome_debug.log'
@@ -74,14 +80,51 @@ def filter_notification_requests():
                                         if res >-1:
                                                 print('Found SW  :: ', cont_id)
                                         if res2 >-1:
-                                                print('Found Notification Request :: ', cont_id)
-                                                with open('./data/filtered_sw_urls.csv','a+') as f:
-                                                        f.write(id+','+url+'\n')
+                                                print('Found Notification Request :: ', cont_id)                                                
+                                                dbo.update_alexa_sites_table(None, url, 'has_notification_request', 'true')
+                                                # with open('./data/filtered_sw_urls.csv','a+') as f:
+                                                #         f.write(id+','+url+'\n')
                 except Exception as e:
                         print(e)
                         continue
 
-filter_notification_requests()
+def filter_notification_requests_dir():
+        import tarfile
+
+        urls = fetch_urls_from_file()
+                
+        dir_path = './crawl_containers_data/'  
+        
+        for file in os.listdir(dir_path):
+                if 'Alexa' not in file:
+                        continue
+                try:
+                        
+                        cont_id = file
+                        # print(url)
+                        if os.path.exists(dir_path+cont_id+'/'):
+                                # print(cont_id)
+                                log_tar_dir = dir_path+cont_id+'/chrome_log_0.tar'
+                                t = tarfile.open(log_tar_dir,'r')
+                                chrome_log_file = 'chrome_debug.log'
+                                if chrome_log_file in t.getnames():
+                                        f = t.extractfile(chrome_log_file)
+                                        data = f.read()
+                                        res = data.find('=registerServiceWorker')
+                                        
+                                        res2 = data.find('=RequestPermission')
+                                        if res >-1:
+                                                print('Found SW  :: ', cont_id)
+                                        if res2 >-1:
+                                                print('Found Notification Request :: ', cont_id)                                                
+                                                dbo.update_alexa_sites_table(cont_id.split('_')[-1] ,None , 'has_notification_request', 'true')
+                                                # with open('./data/filtered_sw_urls.csv','a+') as f:
+                                                #         f.write(id+','+url+'\n')
+                except Exception as e:
+                        print(e)
+                        continue
+
+filter_notification_requests_dir()
 
 
 # with open('./data/malicious_sites_sw.csv','w') as f:
