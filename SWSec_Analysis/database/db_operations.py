@@ -96,11 +96,14 @@ class DBOperator:
 
     def update_sw_event_duration_table(self, container_id, node_info):
         try:
-            self.cursor.execute("""
-            SELECT * FROM sw_event_duration WHERE container_id = %s AND
-            node_id = %s AND process_id = %s
-            """, (container_id, node_info['st_node_id'], node_info['process_id']))
-            if self.cursor.rowcount == 0:
+            if ('end_label' in node_info):
+                self.cursor.execute("""
+                        INSERT INTO sw_event_duration (container_id, process_id,
+                                        node_id, st_time, end_time, st_label, end_label)
+                        VALUES (%s, %s, %s, %s, %s, %s, %s)""",
+                        (container_id, node_info['process_id'], node_info['st_node_id'], node_info['st_timestamp'],node_info['end_timestamp'],
+                        node_info['st_label'], node_info['end_label']))
+            else:
                 self.cursor.execute(
                     """
                     INSERT INTO sw_event_duration (container_id, process_id,
@@ -108,28 +111,43 @@ class DBOperator:
                     VALUES (%s, %s, %s, %s, %s)""",
                     (container_id, node_info['process_id'], node_info['st_node_id'], node_info['timestamp'],
                     node_info['label']))
-            else:
-                self.cursor.execute("""
-                    UPDATE sw_event_duration SET end_label = %s , end_time = %s
-                    WHERE container_id = %s AND node_id = %s AND process_id = %s
-                    """, (node_info['label'], node_info['timestamp'] ,container_id, node_info['st_node_id'], node_info['process_id']))
+
+            # self.cursor.execute("""
+            # SELECT * FROM sw_event_duration WHERE container_id = %s AND
+            # node_id = %s AND process_id = %s
+            # """, (container_id, node_info['st_node_id'], node_info['process_id']))
+            # if self.cursor.rowcount == 0:
+            #     self.cursor.execute(
+            #         """
+            #         INSERT INTO sw_event_duration (container_id, process_id,
+            #                         node_id, st_time, st_label)
+            #         VALUES (%s, %s, %s, %s, %s)""",
+            #         (container_id, node_info['process_id'], node_info['st_node_id'], node_info['timestamp'],
+            #         node_info['label']))
+            # else:
+            #     self.cursor.execute("""
+            #         UPDATE sw_event_duration SET end_label = %s , end_time = %s
+            #         WHERE container_id = %s AND node_id = %s AND process_id = %s
+            #         """, (node_info['label'], node_info['timestamp'] ,container_id, node_info['st_node_id'], node_info['process_id']))
         except Exception as e:
             print('ERROR :: Database ', e)
 
 
-    def insert_notification(self, notification_obj):
+    def insert_notification(self,container_id, notification_obj):
         try:
             self.cursor.execute(
                     """
-                    INSERT INTO notification_details_latest (sw_url_id,notification_title, notification_body,notification_count, target_url, image_url, sw_url, timestamp)
-                    VALUES (%s, %s, %s, %s, %s, %s, %s, %s)""",
-                    (notification_obj['log_id'],
-                    notification_obj['push_notification_title'] , 
-                    notification_obj['push_notification_body'] , 
-                    notification_obj['notification_count'] , 
-                    notification_obj['push_notification_target_url'] , 
-                    notification_obj['push_notification_image'] , 
-                    notification_obj['frame_url'],
+                    INSERT INTO notification_details (container_id, sw_url, notification_title, notification_body, 
+                    notification_tag, image_url, icon_url, badge_url, timestamp)
+                    VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s)""",
+                    (container_id,
+                    notification_obj['sw_url'],
+                    notification_obj['notification_title'] , 
+                    notification_obj['notification_body'] , 
+                    notification_obj['notification_tag'] , 
+                    notification_obj['notification_image'] , 
+                    notification_obj['notification_icon'] , 
+                    notification_obj['notification_badge'] , 
                     notification_obj['timestamp'] ))
             if self.cursor.rowcount == 1:
                 return True
