@@ -80,28 +80,45 @@ def create_tables():
                     )
             """)
 
-'''
-Table :: alexa_sites
+    '''
+    Table :: alexa_sites
 
-site_id
-site_url
-domain
-rank
-is_crawled
-is_sw_found
-is_analyzed
-has_notification_request
-                    
-'''
-cursor.execute("""
-        CREATE TABLE alexa_sites
-                (
-                    site_id SERIAL, PRIMARY KEY(site_id),
-                    site_url TEXT UNIQUE ,domain TEXT UNIQUE , rank INT,  is_crawled BOOLEAN ,
-                    is_sw_found BOOLEAN , ia_analyzed BOOLEAN ,
-                    has_notification_request BOOLEAN 
-                )
-        """)
+    site_id
+    site_url
+    domain
+    rank
+    is_crawled
+    is_sw_found
+    is_analyzed
+    has_notification_request
+                        
+    '''
+    cursor.execute("""
+            CREATE TABLE alexa_sites
+                    (
+                        site_id SERIAL, PRIMARY KEY(site_id),
+                        site_url TEXT UNIQUE ,domain TEXT UNIQUE , rank INT,  is_crawled BOOLEAN ,
+                        is_sw_found BOOLEAN , ia_analyzed BOOLEAN ,
+                        has_notification_request BOOLEAN 
+                    )
+            """)
+    '''
+    Table :: container_output_logs
+
+    log_id
+    container_id
+    event_time
+    event        
+    '''
+    cursor.execute("""
+            CREATE TABLE container_output_logs
+                    (
+                        log_id SERIAL, PRIMARY KEY(log_id),
+                        container_id TEXT ,
+                        event_time TIMESTAMP , 
+                        event TEXT 
+                    )
+            """)
 
 conn.commit()
 

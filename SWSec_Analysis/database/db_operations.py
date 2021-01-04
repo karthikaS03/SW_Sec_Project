@@ -156,6 +156,16 @@ class DBOperator:
             return False
         return False
 
+    def insert_container_log(self, container_id, ev_time, event):
+        try:
+            self.cursor.execute(
+                """
+                INSERT INTO container_output_logs (container_id, event_time, event )
+                VALUES (%s, %s, %s)""",
+                (container_id, ev_time, event))
+        except Exception as e:
+            print('ERROR :: Database ', e)
+
 
     def insert_request(self, req_obj):
         try:
