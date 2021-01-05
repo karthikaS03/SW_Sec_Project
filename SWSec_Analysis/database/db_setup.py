@@ -102,23 +102,25 @@ def create_tables():
                         has_notification_request BOOLEAN 
                     )
             """)
-    '''
-    Table :: container_output_logs
+'''
+Table :: container_output_logs
 
-    log_id
-    container_id
-    event_time
-    event        
-    '''
-    cursor.execute("""
-            CREATE TABLE container_output_logs
-                    (
-                        log_id SERIAL, PRIMARY KEY(log_id),
-                        container_id TEXT ,
-                        event_time TIMESTAMP , 
-                        event TEXT 
-                    )
-            """)
+log_id
+container_id
+iteration
+event_time
+event        
+'''
+cursor.execute("""
+        CREATE TABLE container_output_logs
+                (
+                    log_id SERIAL, PRIMARY KEY(log_id),
+                    container_id TEXT ,
+                    iteration INT,
+                    event_time TIMESTAMP , 
+                    event TEXT 
+                )
+        """)
 
 conn.commit()
 
