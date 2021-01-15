@@ -22,15 +22,18 @@ class DBOperator:
             sys.exit()
         self.cursor = self.conn.cursor()
         self.conn.set_session(autocommit=True)
+        self.log_db = True
 
     def bye(self,):
         self.cursor.close()
         self.conn.close()
 
     def get_seed_urls(self,is_crawl, count=10):
+        if not self.log_db:
+            return
         if is_crawl:
             query = """
-            SELECT rank, site_url FROM alexa_sites WHERE is_crawled is NULL  
+            SELECT rank, site_url FROM alexa_sites WHERE is_crawled is NULL  order by rank
             LIMIT %s
             """ %(count)
         else:
@@ -40,7 +43,19 @@ class DBOperator:
         self.cursor.execute(query)
         return [x for x in self.cursor.fetchall()]
 
+    ### get sw_urls whose rank are unknown
+    def get_sw_urls(self):
+        if not self.log_db:
+            return
+        query = """
+        SELECT sw_url FROM sw_urls WHERE rank is null
+        """ 
+        self.cursor.execute(query)
+        return [x[0] for x in self.cursor.fetchall()]
+
     def update_sw_events_info_table(self, container_id, sw_event_info):
+        if not self.log_db:
+            return
         try:
             self.cursor.execute(
                 """
@@ -52,7 +67,8 @@ class DBOperator:
             print('ERROR :: Database ', e)
 
     def update_process_task_usage_table(self, container_id, task_usage_info):
-       
+        if not self.log_db:
+            return
         try:
             self.cursor.execute(
             """
@@ -64,7 +80,8 @@ class DBOperator:
             print('ERROR :: Database ', e)
 
     def insert_alexa_sites_table(self, site_url, site_rank):
-       
+        if not self.log_db:
+            return
         try:
             self.cursor.execute(
             """
@@ -75,6 +92,8 @@ class DBOperator:
             print('ERROR :: Database ', e)
 
     def update_alexa_sites_table(self, site_rank, site_url, column_name, column_val):
+        if not self.log_db:
+            return
         query= """ UPDATE alexa_sites SET """+ column_name +""" = """+ column_val
         try:
             if column_name == 'is_crawled':
@@ -95,6 +114,8 @@ class DBOperator:
             print('ERROR :: Database ', e)
 
     def update_sw_event_duration_table(self, container_id, node_info):
+        if not self.log_db:
+            return
         try:
             if ('end_label' in node_info):
                 self.cursor.execute("""
@@ -134,6 +155,8 @@ class DBOperator:
 
 
     def insert_notification(self,container_id, notification_obj):
+        if not self.log_db:
+            return
         try:
             self.cursor.execute(
                     """
@@ -156,8 +179,21 @@ class DBOperator:
             return False
         return False
 
+    def get_output_log_iteration(self, container_id):
+        self.cursor.execute("""SELECT MAX(iteration) FROM container_output_logs WHERE container_id =%s""",
+            (container_id))
+        if self.cursor.rowcount == 0:
+            iteration = 0
+        else:
+            iteration = [x for x in self.cursor.fetchall()][0] + 1
+        return iteration
+        
+
     def insert_container_log(self, container_id, iteration,  ev_time, event):
+        if not self.log_db:
+            return
         try:
+            
             self.cursor.execute(
                 """
                 INSERT INTO container_output_logs (container_id, iteration, event_time, event )
@@ -166,8 +202,21 @@ class DBOperator:
         except Exception as e:
             print('ERROR :: Database ', e)
 
+    def update_sw_url(self, sw_url, sw_sld_domain,  rank):
+        if not self.log_db:
+            return
+        try:            
+            self.cursor.execute(
+                """
+                UPDATE sw_urls set  sw_sld_domain= %s, rank =%s 
+                WHERE sw_url= %s""",
+                ( sw_sld_domain, rank, sw_url))
+        except Exception as e:
+            print('ERROR :: Database ', e)
 
     def insert_request(self, req_obj):
+        if not self.log_db:
+            return
         try:
             self.cursor.execute(
                     """
