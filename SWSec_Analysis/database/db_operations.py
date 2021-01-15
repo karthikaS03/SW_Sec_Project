@@ -180,12 +180,13 @@ class DBOperator:
         return False
 
     def get_output_log_iteration(self, container_id):
-        self.cursor.execute("""SELECT MAX(iteration) FROM container_output_logs WHERE container_id =%s""",
-            (container_id))
-        if self.cursor.rowcount == 0:
+        query = """SELECT MAX(iteration) FROM container_output_logs WHERE container_id ='%s'"""%(container_id)
+        self.cursor.execute(query)
+        res = self.cursor.fetchone()[0]
+        if res is None:
             iteration = 0
         else:
-            iteration = [x for x in self.cursor.fetchall()][0] + 1
+            iteration = res + 1
         return iteration
         
 
