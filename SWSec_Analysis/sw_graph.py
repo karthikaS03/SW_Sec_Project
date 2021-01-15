@@ -1,5 +1,5 @@
 import pygraphviz as pgv
-from datetime import datetime
+from datetime import datetime, timedelta
 from parse_logs.parse_utils import *
 import pandas as pd 
 import matplotlib.pyplot as plt
@@ -8,6 +8,8 @@ import matplotlib.pyplot as plt
 from database import db_operations
 
 dbo = db_operations.DBOperator()
+
+# dbo.log_db =False
 
 LOG_FILE = None
 
@@ -72,7 +74,7 @@ def get_next_node_info():
             # print(line)
             line = LOG_FILE.readline().decode('utf-8')
 
-            if 'LOG::Forensics' in line and line.count(':')>1 and 'DebugInfo' not in line and 'LogTaskUsageInfo' not in line:
+            if 'LOG::Forensics' in line and line.count(':')>1 and 'DebugInfo' not in line :#and 'LogTaskUsageInfo' not in line:
                 # proc_id = '_'.join(line.split(':')[:2])
                 proc_id = line.split(':')[0]
                 proc_id = int(proc_id.split('[')[1])
@@ -80,14 +82,20 @@ def get_next_node_info():
                 #     continue
                 time = line.split(':')[2] 
                 try:
-                    
-                    timestamp = datetime(2020, int(time[:2]), int(time[2:4]), int(time[5:7]),int(time[7:9]), int(time[9:11]), int(time[12:]))
+                    if int(time[:2])>5:
+                        year = 2020
+                    else:
+                        year = 2021
+                    timestamp = datetime(year, int(time[:2]), int(time[2:4]), int(time[5:7]),int(time[7:9]), int(time[9:11]), int(time[12:]))
+                    ## container ahead of time by 5 hours
+                    timestamp = timestamp - timedelta(hours=5)
                 except Exception as e:
                     print(e)
                     timestamp = None
                 entries = parse_log_entry(LOG_FILE)
                     
                 if 'func_name' in entries:
+                    
                     if entries['func_name'] in FOCUSSED_LOG_NAMES:
                         # print(entries['func_name'])
                         node_id = get_node_id()
@@ -96,6 +104,7 @@ def get_next_node_info():
                             print('\tPUSH ::', entries['script_url'], entries['registration_id'])
                         
                     elif entries['func_name']  == PROCESS_TASK_USAGE_METHOD:
+                        # print(entries['func_name'])
                         parse_task_usage(timestamp, entries)
                 return node_id,timestamp, proc_id, entries
             #elif 'INFO:CONSOLE' in line :                
@@ -116,27 +125,36 @@ def parse_task_usage(timestamp,log_entries):
         process_task_usage['memory'].append(task_usage_info['memory'])
         process_task_usage['timestamp'].append(timestamp)
         
+        # print(task_usage_info)
+        # print(process_task_usage)
         # dbo.update_process_task_usage_table(CONTAINER_ID, task_usage_info)
 
 
 def _truncate_time_to_sec(t):
     
-    """ remove seconds from datetime t """
+    
     t_str = t.strftime(_TIME_STR_FORMAT)
     return datetime.strptime(t_str, _TIME_STR_FORMAT)
+
+
+def _truncate_time_to_min(t):
+    TIME_STR_FORMAT ="%Y-%m-%d-%H:%M"
+    
+    t_str = t.strftime(TIME_STR_FORMAT+":00")
+    return datetime.strptime(t_str, TIME_STR_FORMAT+":00")
     
 def plot_task_usage(id):
     global process_task_usage
-    
+    # print(process_task_usage)
     df = pd.DataFrame(process_task_usage)
-    # print(df.head())
+    print(df.head())
     if not df.empty :
         try:
-            print(min(df['timestamp']),max(df['timestamp']))
+            # print(min(df['timestamp']),max(df['timestamp']))
             min_time = _truncate_time_to_sec(min(df['timestamp']))
             max_time = _truncate_time_to_sec(max(df['timestamp']))
             
-            _, axes = plt.subplots(nrows=3, ncols=1, figsize=(8,10))
+            _, axes = plt.subplots(nrows=2, ncols=1, figsize=(8,10))
             df_proc_cpu = pd.DataFrame()
             df_proc_mem = pd.DataFrame()
             process_titles = df['title'].unique()
@@ -196,8 +214,10 @@ def plot_task_usage(id):
             
             # plt.legend( bbox_to_anchor=(0,2,1,100),mode='expand')
             
-            # plt.show()             
-            return axes, min_time,max_time
+            # plt.show()   
+            plt.tight_layout() 
+            plt.savefig('./plots/'+id+'_proc_usage.pdf')          
+            return  min_time,max_time
         except Exception as e:
             return None
     return None                     
@@ -231,7 +251,7 @@ def draw_sw_graph(id):
         return proc_start_nodes_idx[-1],False  
             
     def log_sw_events( entries,timestamp):
-        if 'service_worker_url' in entries or ('func_name' in entries and 'registerServiceWorker' in entries['func_name']):
+        if 'service_worker_url' in entries or ('func_name' in entries and entries['func_name'] in ['registerServiceWorker', 'InitializeOnWorkerThread'] ):
             sw_info = {
                         'timestamp'  : timestamp,
                         'sw_url'     : entries['service_worker_url'] if 'service_worker_url' in entries else entries['request_url'], 
@@ -325,54 +345,57 @@ def draw_sw_graph(id):
         print(e) 
     
     
-def plot_sw_events(plt_det):
+def plot_sw_events(plt_det, id):
     global sw_events_info
-    
+    print(sw_events_info)
+    print(plt_det)
     if plt_det==None:
         return
-    axes, min_time,max_time = plt_det
-    print(sw_events_info)
+    min_time,max_time = plt_det
+    plt.clf()
+    _, axes = plt.subplots(nrows=2, ncols=1, figsize=(8,10))
+    
     df_events = pd.DataFrame(sw_events_info)    
 
     
     if df_events.empty:
         return
     sw_urls = df_events['sw_url'].unique()
-    print(sw_urls)
-    # print(process_titles)
+    
     y_point = 10
-    for sw_url in sw_urls:
-        
+    colors = ['b', 'g','r','c','y']
+    for sw_url in sw_urls:        
         try:                                               
             df_events_filtered = df_events[df_events['sw_url']==sw_url]
             df_events_filtered = df_events_filtered.drop(columns=['sw_url'])
-            df_events_filtered['timestamp'] = [_truncate_time_to_sec(t) for t in df_events_filtered['timestamp']]
-            df_events_filtered = df_events_filtered.groupby('timestamp')['event_name'].apply(lambda ev : '--'.join(set(ev)))
+            df_events_filtered['timestamp'] = [_truncate_time_to_min(t) for t in df_events_filtered['timestamp']]
+            df_events_filtered = df_events_filtered.groupby('timestamp')['event_name'].apply(lambda ev : '\n'.join(set(ev)))
             df_events_filtered = df_events_filtered.reset_index()
             df_events_filtered = df_events_filtered.drop_duplicates()     
             print(df_events_filtered.head())
-                    
+            min_time = _truncate_time_to_min(min_time)
+            max_time = _truncate_time_to_min(max_time)
             # df_events_filtered['timestamp'] = df_events_filtered['timestamp'].astype('float')  
-            att = df_events_filtered.set_index('timestamp')           
-            idx = pd.date_range(min_time, max_time, freq='S')
-            date_reidx = att.reindex(idx)
-            # print(att.head())
-            # print(date_reidx)
-            # date_reidx[sw_url] = date_reidx['event_name']
+            att = df_events_filtered.set_index('timestamp')      
+            print(att.head(n=20))     
+            idx = pd.date_range(min_time, max_time, freq='min')
+            date_reidx = att.reindex(idx)            
             date_reidx = date_reidx.reset_index()            
             date_reidx['y'] = date_reidx['event_name'].apply(lambda x: y_point if len(str(x))>3 else -1) 
-            y_point += 15
+            y_point += 10
+            print(date_reidx)
+            # date_reidx.to_csv('plot.csv')
 
-
-            fig = date_reidx.plot('index','y' ,ax=axes[2], kind='line', style='.',
+            fig = date_reidx.plot('index','y' , ax=axes[0], kind='line', style='.', color = colors.pop(0),
                 legend=True).legend(loc= 'upper center', 
                 # bbox_to_anchor=(0.02,1.5),
-                ncol=2,prop={'size':4},)
+                prop={'size':4})
+            
 
             for i,row in date_reidx.iterrows():
                 # break
                 if row['y']>0:
-                    axes[2].annotate(xy=(row['index'], row['y']), s=row['event_name'], ha='left', rotation=90, position=(row['index'],row['y']-10))
+                    axes[0].annotate(xy=(row['index'], row['y']), s=row['event_name'], ha='left', rotation=0, position=(row['index'],row['y']))
 
 
         
@@ -380,7 +403,9 @@ def plot_sw_events(plt_det):
             print(e)
             continue
             
-    axes[2].set_ylim(0, y_point)
+    axes[0].set_ylim(0, y_point)
+    # plt.tight_layout() 
+    plt.savefig('./plots/'+id+'_sw_events.pdf')
     # plt.show()
             
     
@@ -412,8 +437,8 @@ if __name__ == "__main__":
         exit()
 
     
-    log_dir_path = '../SWSec_Crawler/sw_sec_containers_data/sw_sec_containers_data/' 
-
+    log_dir_path = '../SWSec_Crawler/sw_sec_project_maserati/sw_sec_containers_data/' 
+    # dbo.log_db =False
     for dir in os.listdir(log_dir_path):
         log_path = os.path.join(log_dir_path,dir)  
         if 'Ana_' not in dir:# or '3102' not in dir:
@@ -432,9 +457,12 @@ if __name__ == "__main__":
                     id = id.replace('.tar','')
                     CONTAINER_ID = id
 
-                    if os.path.exists('./dot_graphs/'+id+'.txt'):# or '_848' in id or '_189' in id:
+                    ''' if os.path.exists('./dot_graphs/'+id+'.txt') '''
+
+                    if not any([ x in dir for x in ['_1833' ,'_1947', '_20156', '_27222', '_3244', '_33336','_9421','_20805', '_3638', '_52292', '_41369','_51778', '_50301','_40261','_32345']]):
                         continue
-                    
+
+                    print(dir)
                     log_tar_dir = os.path.join(log_path,tar_file)
                     t = tarfile.open(log_tar_dir,'r')
                     LOG_FILE = t.extractfile('chrome_debug.log') 
@@ -446,12 +474,10 @@ if __name__ == "__main__":
                     draw_sw_graph(id)
                     
                     ### uncomment if plots needs to be drawn
-                    '''
-                    plt_det = plot_task_usage(id)
-                    plot_sw_events(plt_det)
-                    plt.tight_layout() 
-                    plt.savefig('./plots/'+id+'_proc_usage.pdf')
-                    '''
+                    
+                    plt_det = plot_task_usage(id)                   
+                    plot_sw_events(plt_det, id)
+                    
                     # exit()
             except Exception as e:
                 continue
