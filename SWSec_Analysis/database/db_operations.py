@@ -60,10 +60,10 @@ class DBOperator:
         try:
             self.cursor.execute(
                 """
-                INSERT INTO sw_events_info (container_id, sw_url, ev_timestamp, event_name
+                INSERT INTO sw_events_info (container_id, sw_url, ev_timestamp, event_name, request_url
                                     )
-                VALUES (%s, %s, %s, %s)""",
-                (container_id, sw_event_info['sw_url'], sw_event_info['timestamp'], sw_event_info['event_name']))
+                VALUES (%s, %s, %s, %s, %s)""",
+                (container_id, sw_event_info['sw_url'], sw_event_info['timestamp'], sw_event_info['event_name'], sw_event_info['request_url']))
         except Exception as e:
             print('ERROR :: Database ', e)
 
