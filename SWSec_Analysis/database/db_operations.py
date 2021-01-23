@@ -38,7 +38,8 @@ class DBOperator:
             """ %(count)
         else:
             query = """
-            SELECT rank, site_url FROM alexa_sites WHERE is_crawled=True AND is_sw_found=True AND has_notification_request=True LIMIT %s
+            SELECT rank, site_url FROM alexa_sites WHERE is_crawled=True AND is_sw_found=True AND has_notification_request=True 
+            AND is_analyzed is NULL order by rank LIMIT %s
             """ %(count)
         self.cursor.execute(query)
         return [x for x in self.cursor.fetchall()]
@@ -48,7 +49,7 @@ class DBOperator:
         if not self.log_db:
             return
         query = """
-        SELECT sw_url FROM sw_urls WHERE rank is null
+        SELECT distinct sw_url FROM sw_events_info WHERE sw_url not in (select sw_url from sw_urls)
         """ 
         self.cursor.execute(query)
         return [x[0] for x in self.cursor.fetchall()]
@@ -161,7 +162,7 @@ class DBOperator:
             self.cursor.execute(
                     """
                     INSERT INTO notification_details (container_id, sw_url, notification_title, notification_body, 
-                    notification_tag, image_url, icon_url, badge_url, timestamp)
+                    notification_tag, image_url, icon_url, badge_url, timestamp, event)
                     VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s)""",
                     (container_id,
                     notification_obj['sw_url'],
@@ -171,7 +172,8 @@ class DBOperator:
                     notification_obj['notification_image'] , 
                     notification_obj['notification_icon'] , 
                     notification_obj['notification_badge'] , 
-                    notification_obj['timestamp'] ))
+                    notification_obj['timestamp'],
+                    notification_obj['event'] ))
             if self.cursor.rowcount == 1:
                 return True
         except Exception as e:
@@ -209,9 +211,8 @@ class DBOperator:
         try:            
             self.cursor.execute(
                 """
-                UPDATE sw_urls set  sw_sld_domain= %s, rank =%s 
-                WHERE sw_url= %s""",
-                ( sw_sld_domain, rank, sw_url))
+                INSERT INTO sw_urls(sw_url,sw_sld_domain,rank) VALUES(%s, %s, %s)""",
+                ( sw_url,sw_sld_domain, rank))
         except Exception as e:
             print('ERROR :: Database ', e)
 

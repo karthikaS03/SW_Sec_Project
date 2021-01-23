@@ -79,7 +79,7 @@ def parse_log_entry(f):
                     if key in multi_line_fields:
                         key, value = parse_multi_line_field(line, f)
 
-                        entries[key] = value
+                        entries[key] = value.replace('"','')
                 except Exception as e:
                     print ("Exception: parse_log_entry()", e)
                     #ipdb.set_trace()   

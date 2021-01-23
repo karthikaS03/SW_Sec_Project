@@ -251,10 +251,11 @@ def draw_sw_graph(id):
         return proc_start_nodes_idx[-1],False  
             
     def log_sw_events( entries,timestamp):
-        if 'service_worker_url' in entries or ('func_name' in entries and entries['func_name'] in ['registerServiceWorker', 'InitializeOnWorkerThread'] ):
+        if 'service_worker_url' in entries or ('func_name' in entries and entries['func_name'] in ['registerServiceWorker', 'InitializeOnWorkerThread','Fetch' ] ):
             sw_info = {
                         'timestamp'  : timestamp,
                         'sw_url'     : entries['service_worker_url'] if 'service_worker_url' in entries else entries['request_url'], 
+                        'request_url': entries['request_url'] if 'request_url' in entries else '',
                         'event_name' : entries['func_name']                                     
             }
             # print(entries)
@@ -262,7 +263,7 @@ def draw_sw_graph(id):
             sw_events_info.append(sw_info)                    
             dbo.update_sw_events_info_table(CONTAINER_ID, sw_info)
 
-        if 'func_name' in entries and 'showNotification' in entries['func_name']:
+        if 'func_name' in entries and entries['func_name'] in ['showNotification','DispatchNotificationCloseEvent']:
             notification_obj = {
                 'notification_title': entries['notification_title'],
                 'notification_body': entries['notification_body'],
@@ -271,7 +272,8 @@ def draw_sw_graph(id):
                 'notification_icon': entries['notification_icon'],
                 'notification_badge': entries['notification_badge'],
                 'sw_url' : entries['context_url'],
-                'timestamp' : timestamp
+                'timestamp' : timestamp,
+                'event' : entries['func_name']
             }
             dbo.insert_notification(CONTAINER_ID, notification_obj)
 
@@ -437,7 +439,7 @@ if __name__ == "__main__":
         exit()
 
     
-    log_dir_path = '../SWSec_Crawler/sw_sec_project_maserati/sw_sec_containers_data/' 
+    log_dir_path = '../SWSec_Crawler/sw_sec_containers_data/' 
     # dbo.log_db =False
     for dir in os.listdir(log_dir_path):
         log_path = os.path.join(log_dir_path,dir)  
@@ -457,9 +459,9 @@ if __name__ == "__main__":
                     id = id.replace('.tar','')
                     CONTAINER_ID = id
 
-                    ''' if os.path.exists('./dot_graphs/'+id+'.txt') '''
+                    if os.path.exists('./dot_graphs/'+id+'.txt'):
 
-                    if not any([ x in dir for x in ['_1833' ,'_1947', '_20156', '_27222', '_3244', '_33336','_9421','_20805', '_3638', '_52292', '_41369','_51778', '_50301','_40261','_32345']]):
+                    #if not any([ x in dir for x in ['_1833' ,'_1947', '_20156', '_27222', '_3244', '_33336','_9421','_20805', '_3638', '_52292', '_41369','_51778', '_50301','_40261','_32345']]):
                         continue
 
                     print(dir)
@@ -475,8 +477,8 @@ if __name__ == "__main__":
                     
                     ### uncomment if plots needs to be drawn
                     
-                    plt_det = plot_task_usage(id)                   
-                    plot_sw_events(plt_det, id)
+                    #plt_det = plot_task_usage(id)                   
+                    #plot_sw_events(plt_det, id)
                     
                     # exit()
             except Exception as e:
