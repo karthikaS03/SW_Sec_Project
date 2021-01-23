@@ -163,7 +163,7 @@ class DBOperator:
                     """
                     INSERT INTO notification_details (container_id, sw_url, notification_title, notification_body, 
                     notification_tag, image_url, icon_url, badge_url, timestamp, event)
-                    VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s)""",
+                    VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s)""",
                     (container_id,
                     notification_obj['sw_url'],
                     notification_obj['notification_title'] , 
