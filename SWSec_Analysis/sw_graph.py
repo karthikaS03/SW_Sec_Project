@@ -40,6 +40,8 @@ FOCUSSED_LOG_NAMES = set(['registerServiceWorker', 'InitializeOnWorkerThread',
                         'ResetIdleTimeout','requestPermission','PermissionDecided'
                         ])
 
+FOCUSSED_LOG_NAMES =set(['openWindow'])
+
 PROCESS_TASK_USAGE_METHOD = 'FillProcessData'
 
 FOCUSSED_PROCESS_TAGS = [
@@ -74,7 +76,7 @@ def get_next_node_info():
             # print(line)
             line = LOG_FILE.readline().decode('utf-8')
 
-            if 'LOG::Forensics' in line and line.count(':')>1 and 'DebugInfo' not in line :#and 'LogTaskUsageInfo' not in line:
+            if 'LOG::Forensics' in line and line.count(':')>1 and 'LogSWContextInfo' in line :#and 'DebugInfo' not in line and 'LogTaskUsageInfo' not in line:
                 # proc_id = '_'.join(line.split(':')[:2])
                 proc_id = line.split(':')[0]
                 proc_id = int(proc_id.split('[')[1])
@@ -131,8 +133,7 @@ def parse_task_usage(timestamp,log_entries):
 
 
 def _truncate_time_to_sec(t):
-    
-    
+        
     t_str = t.strftime(_TIME_STR_FORMAT)
     return datetime.strptime(t_str, _TIME_STR_FORMAT)
 
@@ -311,7 +312,7 @@ def draw_sw_graph(id):
                     ### this eliminates recording null event
                     if (timestamp-st_timestamp).total_seconds() >2:
                         node_info = {'st_label': st_node.attr['label'], 'end_label': label, 'st_node_id': str(st_node_id), 'st_timestamp': st_timestamp, 'end_timestamp': timestamp, 'process_id': proc_id }
-                        dbo.update_sw_event_duration_table(CONTAINER_ID, node_info)
+                        # dbo.update_sw_event_duration_table(CONTAINER_ID, node_info)
                     st_node.attr['label'] = st_node.attr['label'] + ' (' +str((timestamp-st_timestamp).total_seconds()) + ')'
 
                     G.remove_node(node_id)
@@ -331,15 +332,14 @@ def draw_sw_graph(id):
             st_node_id, st_timestamp, st_proc_id = item
             st_node = G.get_node(st_node_id) 
             node_info = {'label': st_node.attr['label'], 'st_node_id': str(st_node_id), 'timestamp': st_timestamp, 'process_id': st_proc_id }
-            dbo.update_sw_event_duration_table(CONTAINER_ID, node_info)
+            # dbo.update_sw_event_duration_table(CONTAINER_ID, node_info)
 
-        # while len(start_nodes)>0:
-        #     node_id,timestamp = 
-        #     node = 
+        
 
-        s = G.to_string()
-        with open('./dot_graphs/'+id+'.txt', 'w') as f:
-            f.write(s) 
+        # s = G.to_string()
+        # with open('./dot_graphs/'+id+'.txt', 'w') as f:
+        #     f.write(s) 
+
         # G.layout("dot")  # layout with dot
         # G.draw('./plots/'+id+"_sw_flow_graph.png")
         
@@ -459,10 +459,8 @@ if __name__ == "__main__":
                     id = id.replace('.tar','')
                     CONTAINER_ID = id
 
-                    if os.path.exists('./dot_graphs/'+id+'.txt'):
-
-                    #if not any([ x in dir for x in ['_1833' ,'_1947', '_20156', '_27222', '_3244', '_33336','_9421','_20805', '_3638', '_52292', '_41369','_51778', '_50301','_40261','_32345']]):
-                        continue
+                    # if os.path.exists('./dot_graphs/'+id+'.txt'):
+                    #     continue
 
                     print(dir)
                     log_tar_dir = os.path.join(log_path,tar_file)
