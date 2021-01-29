@@ -2,10 +2,13 @@
 'use strict';
 
 const puppeteer = require('puppeteer');
-const devices = require('puppeteer/DeviceDescriptors');
-const nexus = devices['Nexus 5'];
+//const devices = require('puppeteer/DeviceDescriptors');
+//const nexus = devices['Nexus 5'];
 var fs = require('fs');
 // var fs_extra = require('fs-extra')
+// import hotkeys from 'hotkeys-js';
+// var hotkeys = require('hotkeys-js')
+var ks = require('node-key-sender')
 
 process.on('unhandledRejection', error => {
   // Prints "unhandledRejection woops!"
@@ -79,6 +82,12 @@ async function load_page(url,id,i_count,wait_time){
                     
                     
                     // await timer(6000)
+                    await p.addScriptTag({ url: 'https://unpkg.com/hotkeys-js/dist/hotkeys.min.js' });
+                    await p.evaluate(() => {
+                      hotkeys('shift+esc',function(event,handler){
+                        console.log('hotkeys entered')
+                      })
+                    })
                     await p.addScriptTag({ url: 'https://unpkg.com/gremlins.js' });
                     console.log('Script injected @ '+new Date(Date.now()).toLocaleString())
                     await p.evaluate(() => {
@@ -90,27 +99,27 @@ async function load_page(url,id,i_count,wait_time){
                     }).unleash()
                     });
                     await setTimeout(async function() {
-                      try{              
-                        await p.reload({waitUntil:['networkidle0', 'domcontentloaded'],timeout:900000 })
-                        console.log('page reloaded')                
-                      }
-                      catch(e){
-                        console.log('timeout')
-                      }  
+                        try{              
+                          await p.reload({waitUntil:['networkidle0', 'domcontentloaded'],timeout:900000 })
+                          console.log('page reloaded')                
+                        }
+                        catch(e){
+                          console.log('timeout')
+                        }  
                       
-                      try{
-                        await context.overridePermissions(url.origin, ['notifications']);
-                        await timer(6000)
-                        const granted = await p.evaluate(async () => {
-                          return (await navigator.permissions.query({name: 'notifications'})).state;
-                        });
-                        console.log('Granted:', granted);            
-                        console.log('permission overriden')
-                      }
-                      catch(e){
-                        console.log('Permission not overriden!!')
-                        console.log(e)
-                      }
+                        try{
+                          await context.overridePermissions(url.origin, ['notifications']);
+                          await timer(6000)
+                          const granted = await p.evaluate(async () => {
+                            return (await navigator.permissions.query({name: 'notifications'})).state;
+                          });
+                          console.log('Granted:', granted);            
+                          console.log('permission overriden')
+                        }
+                        catch(e){
+                          console.log('Permission not overriden!!')
+                          console.log(e)
+                        }
                     }, 60000)
                     
                     await setTimeout(async function() {
@@ -137,6 +146,7 @@ async function load_page(url,id,i_count,wait_time){
           await page.keyboard.press('Escape')
           await page.keyboard.up('Shift')
           console.log('open task manager')
+          ks.sendCombination(['shift','escape'])
           const context = browser.defaultBrowserContext();
           await page.setBypassCSP(true)
           
@@ -145,7 +155,7 @@ async function load_page(url,id,i_count,wait_time){
                   await page.goto(url,{waitUntil: 'load',timeout:900000});                  
               }
               catch(e){
-                console.log('timeout')
+                console.log(e)
               }                   
         }
         catch(error){
