@@ -37,10 +37,10 @@ FOCUSSED_LOG_NAMES = set(['registerServiceWorker', 'InitializeOnWorkerThread',
                         'DispatchNotificationCloseEvent','DidHandleNotificationCloseEvent',
                         'Fetch','FetchAndRunClassicScript', 'importScripts','showNotification',
                         'CreateNotificationData', 'DidReceiveResponse',
-                        'ResetIdleTimeout','requestPermission','PermissionDecided'
+                        'ResetIdleTimeout','requestPermission','PermissionDecided','openWindow'
                         ])
 
-FOCUSSED_LOG_NAMES =set(['openWindow'])
+# FOCUSSED_LOG_NAMES =set(['openWindow'])
 
 PROCESS_TASK_USAGE_METHOD = 'FillProcessData'
 
@@ -64,8 +64,6 @@ def get_node_id():
 
 def get_next_node_info():
     line = 'blah'
-    # print(type(line))
-    # exit()
     if not line:
         return None
     timestamp = None
@@ -73,15 +71,14 @@ def get_next_node_info():
     node_id = -1
     try:
         while(line):
-            # print(line)
+            
             line = LOG_FILE.readline().decode('utf-8')
 
-            if 'LOG::Forensics' in line and line.count(':')>1 and 'LogSWContextInfo' in line :#and 'DebugInfo' not in line and 'LogTaskUsageInfo' not in line:
-                # proc_id = '_'.join(line.split(':')[:2])
+            if 'LOG::Forensics' in line and line.count(':')>1 and 'DebugInfo' not in line and 'LogTaskUsageInfo' not in line:
+                
                 proc_id = line.split(':')[0]
                 proc_id = int(proc_id.split('[')[1])
-                # if '23869' not in proc_id:
-                #     continue
+                
                 time = line.split(':')[2] 
                 try:
                     if int(time[:2])>5:
@@ -98,26 +95,23 @@ def get_next_node_info():
                     
                 if 'func_name' in entries:
                     
-                    if entries['func_name'] in FOCUSSED_LOG_NAMES:
-                        # print(entries['func_name'])
+                    if entries['func_name'] in FOCUSSED_LOG_NAMES:                        
                         node_id = get_node_id()
                         G.add_node(node_id, label=entries['func_name'])
                         if entries['func_name'] == 'DispatchPushEvent':
                             print('\tPUSH ::', entries['script_url'], entries['registration_id'])
                         
-                    elif entries['func_name']  == PROCESS_TASK_USAGE_METHOD:
-                        # print(entries['func_name'])
+                    elif entries['func_name']  == PROCESS_TASK_USAGE_METHOD:                        
                         parse_task_usage(timestamp, entries)
+
                 return node_id,timestamp, proc_id, entries
-            #elif 'INFO:CONSOLE' in line :                
-            #    with open('./demo_results/miner2_responses.txt','a+') as rf:
-            #        rf.write(line)
+            
     except Exception as ex:
             print(ex)
 
 def parse_task_usage(timestamp,log_entries):
     global process_task_usage
-    # print(log_entries)
+    
     if 'process_title' in log_entries:
         task_usage_info = {'title': log_entries['process_title'], 'cpu': float(log_entries['process_cpu']),
                             'memory': float(log_entries['process_memory']), 'timestamp': timestamp}
@@ -146,7 +140,7 @@ def _truncate_time_to_min(t):
     
 def plot_task_usage(id):
     global process_task_usage
-    # print(process_task_usage)
+    
     df = pd.DataFrame(process_task_usage)
     print(df.head())
     if not df.empty :
@@ -258,9 +252,7 @@ def draw_sw_graph(id):
                         'sw_url'     : entries['service_worker_url'] if 'service_worker_url' in entries else entries['request_url'], 
                         'request_url': entries['request_url'] if 'request_url' in entries else '',
                         'event_name' : entries['func_name']                                     
-            }
-            # print(entries)
-            # print('-----')
+            }            
             sw_events_info.append(sw_info)                    
             dbo.update_sw_events_info_table(CONTAINER_ID, sw_info)
 
@@ -284,7 +276,7 @@ def draw_sw_graph(id):
         while( node_info !=None):
             try:
                 node_info = get_next_node_info()
-                # print(node_info)
+                
                 if node_info == None:
                     break
                 node_id,timestamp, proc_id, entries = node_info
@@ -293,8 +285,7 @@ def draw_sw_graph(id):
                     continue
                 node = G.get_node(node_id)
                 label = node.attr['label']
-                # print('Node :: ',label, proc_id, node_id)
-                # print(node_id,proc_id)
+                
                 is_edge =True
                 prev_node_idx,is_end_node = find_st_node(proc_id,label)
                 prev_node_id = start_nodes[prev_node_idx][0] 
@@ -308,21 +299,18 @@ def draw_sw_graph(id):
                     st_node_id, st_timestamp, st_proc_id = start_nodes.pop(prev_node_idx)
                     st_node = G.get_node(st_node_id) 
                     
-
                     ### this eliminates recording null event
                     if (timestamp-st_timestamp).total_seconds() >2:
                         node_info = {'st_label': st_node.attr['label'], 'end_label': label, 'st_node_id': str(st_node_id), 'st_timestamp': st_timestamp, 'end_timestamp': timestamp, 'process_id': proc_id }
-                        # dbo.update_sw_event_duration_table(CONTAINER_ID, node_info)
-                    st_node.attr['label'] = st_node.attr['label'] + ' (' +str((timestamp-st_timestamp).total_seconds()) + ')'
+                        dbo.update_sw_event_duration_table(CONTAINER_ID, node_info)
 
+                    st_node.attr['label'] = st_node.attr['label'] + ' (' +str((timestamp-st_timestamp).total_seconds()) + ')'
                     G.remove_node(node_id)
                     is_edge=False
-                #else:
-                #    print('\t Node :: ',label, proc_id, node_id)
+                
                 if is_edge:
                     G.add_edge(prev_node_id, node_id)
                     
-                # print(prev_node_id,node_id)
             except Exception as e:
                 print(e)
                 continue
@@ -332,13 +320,13 @@ def draw_sw_graph(id):
             st_node_id, st_timestamp, st_proc_id = item
             st_node = G.get_node(st_node_id) 
             node_info = {'label': st_node.attr['label'], 'st_node_id': str(st_node_id), 'timestamp': st_timestamp, 'process_id': st_proc_id }
-            # dbo.update_sw_event_duration_table(CONTAINER_ID, node_info)
+            dbo.update_sw_event_duration_table(CONTAINER_ID, node_info)
 
         
 
-        # s = G.to_string()
-        # with open('./dot_graphs/'+id+'.txt', 'w') as f:
-        #     f.write(s) 
+        s = G.to_string()
+        with open('./dot_graphs/'+id+'.txt', 'w') as f:
+            f.write(s) 
 
         # G.layout("dot")  # layout with dot
         # G.draw('./plots/'+id+"_sw_flow_graph.png")
@@ -377,7 +365,7 @@ def plot_sw_events(plt_det, id):
             print(df_events_filtered.head())
             min_time = _truncate_time_to_min(min_time)
             max_time = _truncate_time_to_min(max_time)
-            # df_events_filtered['timestamp'] = df_events_filtered['timestamp'].astype('float')  
+              
             att = df_events_filtered.set_index('timestamp')      
             print(att.head(n=20))     
             idx = pd.date_range(min_time, max_time, freq='min')
@@ -459,8 +447,8 @@ if __name__ == "__main__":
                     id = id.replace('.tar','')
                     CONTAINER_ID = id
 
-                    # if os.path.exists('./dot_graphs/'+id+'.txt'):
-                    #     continue
+                    if os.path.exists('./dot_graphs/'+id+'.txt'):
+                        continue
 
                     print(dir)
                     log_tar_dir = os.path.join(log_path,tar_file)
