@@ -41,6 +41,9 @@ class DBOperator:
             SELECT rank, site_url FROM alexa_sites WHERE is_crawled=True AND is_sw_found=True AND has_notification_request=True 
             AND is_analyzed is NULL order by rank LIMIT %s
             """ %(count)
+            query = """
+            SELECT rank, site_url FROM alexa_filtered_sites WHERE  is_analyzed = False and rank <5000 order by rank LIMIT %s
+            """ %(count)
         self.cursor.execute(query)
         return [x for x in self.cursor.fetchall()]
 
@@ -49,8 +52,9 @@ class DBOperator:
         if not self.log_db:
             return
         query = """
-        SELECT distinct sw_url FROM sw_events_info WHERE sw_url not in (select sw_url from sw_urls)
+        SELECT distinct request_url FROM sw_events_info WHERE sw_url not in (select sw_url from sw_urls)
         """ 
+        query = """select distinct request_url from sw_events_info where event_name LIKE 'openWindow%' """
         self.cursor.execute(query)
         return [x[0] for x in self.cursor.fetchall()]
 
@@ -95,7 +99,7 @@ class DBOperator:
     def update_alexa_sites_table(self, site_rank, site_url, column_name, column_val):
         if not self.log_db:
             return
-        query= """ UPDATE alexa_sites SET """+ column_name +""" = """+ column_val
+        query= """ UPDATE alexa_filtered_sites SET """+ column_name +""" = """+ column_val
         try:
             if column_name == 'is_crawled':
                 query = query + """, crawl_timestamp = '%s'""" % (datetime.now())
@@ -121,10 +125,10 @@ class DBOperator:
             if ('end_label' in node_info):
                 self.cursor.execute("""
                         INSERT INTO sw_event_duration (container_id, process_id,
-                                        node_id, st_time, end_time, st_label, end_label)
-                        VALUES (%s, %s, %s, %s, %s, %s, %s)""",
+                                        node_id, st_time, end_time, st_label, end_label, sw_url)
+                        VALUES (%s, %s, %s, %s, %s, %s, %s,%s)""",
                         (container_id, node_info['process_id'], node_info['st_node_id'], node_info['st_timestamp'],node_info['end_timestamp'],
-                        node_info['st_label'], node_info['end_label']))
+                        node_info['st_label'], node_info['end_label'], node_info['sw_url']))
             else:
                 self.cursor.execute(
                     """

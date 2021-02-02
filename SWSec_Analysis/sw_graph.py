@@ -13,7 +13,7 @@ dbo = db_operations.DBOperator()
 
 LOG_FILE = None
 
-NODE_LOG_CALLS = set(['LogSWInfo', 'LogSWEvent', 'LogSWContextInfo', 'LogNotificationData', 'DidCallFunction' ,                        ])
+NODE_LOG_CALLS = set(['LogSWInfo', 'LogSWEvent', 'LogSWContextInfo', 'LogNotificationData', 'DidCallFunction' ])
 
 START_END_EVENT_MAPS = {'InitializeOnWorkerThread':'PrepareForShutdownOnWorkerThread',
                         'StartEvent':'EndEvent', 
@@ -246,15 +246,20 @@ def draw_sw_graph(id):
         return proc_start_nodes_idx[-1],False  
             
     def log_sw_events( entries,timestamp):
+        sw_url = entries['service_worker_url'] if 'service_worker_url' in entries else (entries['context_url'] if 'context_url' in entries else '')
+
         if 'service_worker_url' in entries or ('func_name' in entries and entries['func_name'] in ['registerServiceWorker', 'InitializeOnWorkerThread','Fetch' ] ):
             sw_info = {
                         'timestamp'  : timestamp,
-                        'sw_url'     : entries['service_worker_url'] if 'service_worker_url' in entries else entries['request_url'], 
+                        'sw_url'     : entries['service_worker_url'] if 'service_worker_url' in entries else (entries['request_url'] if 'Fetch'!=entries['func_name'] 
+                                        else entries['context_url']), 
                         'request_url': entries['request_url'] if 'request_url' in entries else '',
-                        'event_name' : entries['func_name']                                     
+                        'event_name' : entries['func_name']  if entries['func_name']!='Fetch' else ('Fetch_Page' if str(entries['is_service_worker'])=='0' else 'Fetch_SW')
             }            
-            sw_events_info.append(sw_info)                    
+            sw_events_info.append(sw_info)  
+            sw_url = sw_info['sw_url']                  
             dbo.update_sw_events_info_table(CONTAINER_ID, sw_info)
+            
 
         if 'func_name' in entries and entries['func_name'] in ['showNotification','DispatchNotificationCloseEvent']:
             notification_obj = {
@@ -268,8 +273,20 @@ def draw_sw_graph(id):
                 'timestamp' : timestamp,
                 'event' : entries['func_name']
             }
-            dbo.insert_notification(CONTAINER_ID, notification_obj)
+            sw_info = {
+                        'timestamp'  : timestamp,
+                        'sw_url'     : entries['context_url'], 
+                        'request_url': entries['request_url'] if 'request_url' in entries else '',
+                        'event_name' : entries['func_name']                                     
+            }            
 
+            sw_events_info.append(sw_info)                    
+            dbo.update_sw_events_info_table(CONTAINER_ID, sw_info)
+
+            dbo.insert_notification(CONTAINER_ID, notification_obj)
+            sw_url = sw_info['sw_url']
+        
+        return sw_url
 
     try:
         
@@ -290,7 +307,7 @@ def draw_sw_graph(id):
                 prev_node_idx,is_end_node = find_st_node(proc_id,label)
                 prev_node_id = start_nodes[prev_node_idx][0] 
 
-                log_sw_events(entries,timestamp)
+                sw_url = log_sw_events(entries,timestamp)
 
                 if  label in START_END_EVENT_MAPS:
                     start_nodes.append((node_id,timestamp,proc_id))  
@@ -300,8 +317,9 @@ def draw_sw_graph(id):
                     st_node = G.get_node(st_node_id) 
                     
                     ### this eliminates recording null event
-                    if (timestamp-st_timestamp).total_seconds() >2:
-                        node_info = {'st_label': st_node.attr['label'], 'end_label': label, 'st_node_id': str(st_node_id), 'st_timestamp': st_timestamp, 'end_timestamp': timestamp, 'process_id': proc_id }
+                    if (timestamp-st_timestamp).total_seconds() >2 or (label!='EndEvent'):
+                        node_info = {'st_label': st_node.attr['label'], 'end_label': label, 'st_node_id': str(st_node_id), 
+                                    'st_timestamp': st_timestamp, 'end_timestamp': timestamp, 'process_id': proc_id,  'sw_url': sw_url }
                         dbo.update_sw_event_duration_table(CONTAINER_ID, node_info)
 
                     st_node.attr['label'] = st_node.attr['label'] + ' (' +str((timestamp-st_timestamp).total_seconds()) + ')'
@@ -427,7 +445,7 @@ if __name__ == "__main__":
         exit()
 
     
-    log_dir_path = '../SWSec_Crawler/sw_sec_containers_data/' 
+    log_dir_path = '../SWSec_Crawler/backup_lab/sw_sec_project_maserati/sw_sec_containers_data/' 
     # dbo.log_db =False
     for dir in os.listdir(log_dir_path):
         log_path = os.path.join(log_dir_path,dir)  
