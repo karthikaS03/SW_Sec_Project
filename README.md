@@ -17,3 +17,6 @@ Below is a brief description of the modules in this project
 ***<li> SWSec_Data***: this fodler contains seed URLs that were used for the cralwing and measurement.
 
 ***<li> SWSec_Analysis***: This fodler consists of helper scripts that were used to report measurements by parsing the logs collected by the crawler module and generating graphs reported in the paper.
+
+
+The attacks reproduced and new attacks that are proposed can be accessed in the link: https://demopwa.github.io/sw_index.html. This link contains demos of the attacks with the browser version that the attacks work and their source code. These online demos could serve as a test bed to check new versions of browser to check if they are vulnerable.  
